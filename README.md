@@ -1,2 +1,2 @@
 # MedMirror
-Mirror to help with medication adherence by providing GUI and voice recognition &amp; speech AI 
+Mirror to help with medication adherence by providing a GUI with voice recognition & speech AI 
