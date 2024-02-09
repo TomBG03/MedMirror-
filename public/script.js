@@ -24,6 +24,7 @@ function fetchMedicationsAndUpdateView() {
         .then(response => response.json())
         .then(medications => {
             const medicationsView = document.getElementById('medications-view');
+            // Ensure there's a <ul> element for listing medications
             let list = medicationsView.querySelector('ul');
             if (!list) {
                 list = document.createElement('ul');
@@ -32,16 +33,21 @@ function fetchMedicationsAndUpdateView() {
             list.innerHTML = ''; // Clear existing list items
 
             medications.forEach(med => {
+                // Create a container <li> for each medication
                 const listItem = document.createElement('li');
-                listItem.textContent = `${med.name} - ${med.dosage} - ${med.time}`;
+                
+                // Create a span to hold medication text
+                const medText = document.createElement('span');
+                medText.textContent = `${med.name} - ${med.dosage} - ${med.time}`;
+                listItem.appendChild(medText);
 
-                // Add a delete button
+                // Create and append the delete button
                 const deleteBtn = document.createElement('button');
                 deleteBtn.textContent = 'Delete';
                 deleteBtn.onclick = () => deleteMedication(med._id);
+                listItem.appendChild(deleteBtn); // Append button to the listItem
 
-                listItem.appendChild(deleteBtn);
-                list.appendChild(listItem);
+                list.appendChild(listItem); // Append listItem to the list
             });
         })
         .catch(error => console.error('Error fetching medications:', error));

@@ -36,13 +36,6 @@ ul {
     padding: 0;
 }
 
-li {
-    margin: 10px 0;
-    padding: 10px;
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 5px;
-}
-
 footer {
     font-size: 0.8em;
 }
@@ -57,4 +50,33 @@ footer {
 #navigation button {
     margin-right: 10px;
     padding: 5px 10px;
+}
+
+ul {
+    list-style-type: none; /* Removes default list styling */
+    padding: 0;
+}
+
+li {
+    display: flex; /* Enables flexbox layout within each list item */
+    align-items: center; /* Vertically centers the button and text */
+    justify-content: space-between; /* Separates content and button */
+    margin: 10px 0;
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.1); /* Adjust as needed */
+    border-radius: 5px;
+}
+
+li button {
+    padding: 5px 10px; /* Adjust padding as needed */
+    background-color: #f44336; /* Red color for delete action */
+    color: white; /* White text */
+    border: none; /* Removes border */
+    border-radius: 4px; /* Rounded corners */
+    cursor: pointer; /* Changes cursor to indicate clickable */
+    margin-left: 10px; /* Adds space between the button and text */
+}
+
+li button:hover {
+    background-color: #d32f2f; /* Darker red on hover for visual feedback */
 }

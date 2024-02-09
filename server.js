@@ -15,7 +15,6 @@ mongoose.connection.once('open', () => {
 // Middleware to parse JSON bodies
 app.use(express.json());
 
-
 // Serve static files from the 'public' directory
 app.use(express.static('public'));
 
