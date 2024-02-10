@@ -20,6 +20,13 @@ def audio_to_text(audio_file):
     )
     return transcript.text
 
+# Create a messages array with the system message and the user message
+# This will allow a more natural converation with the chatbot
+# Implement function calls to the chatbot API
+# sometimes a response may not be needed from the chatbot i.e. show calendar 
+
+
+
 def generate_response(prompt):
     response = client.chat.completions.create(
         model=MODEL,
@@ -40,6 +47,7 @@ def text_to_audio(text):
     response = client.audio.speech.create(
         model="tts-1",
         voice="alloy",
+        speed=1.0,
         input=text
     )
     # with open(speech_file_path, "wb") as file:
