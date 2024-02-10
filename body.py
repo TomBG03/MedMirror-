@@ -1,7 +1,55 @@
 import requests
 import argparse
+from openai import OpenAI
+from pathlib import Path
+import os 
+
+
+
+API_KEY = os.getenv('OPENAI_API_KEY')
+MODEL = "gpt-3.5-turbo"
+
+
+client = OpenAI(api_key=API_KEY)
+
+def audio_to_text(audio_file):
+    #audio_file= open("/path/to/file/audio.mp3", "rb")
+    transcript = client.audio.transcriptions.create(
+        model="whisper-1", 
+        file=audio_file
+    )
+    return transcript.text
+
+def generate_response(prompt):
+    response = client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant designed to provide a friendly response and help the user with tasks. When necessary updating the users medication list"},
+            {"role": "user", "content": prompt}
+        ]
+
+    )
+
+    # debug print statement
+    #print(response.choices[0].message.content)
+
+    return response.choices[0].message.content
+
+def text_to_audio(text):
+    speech_file_path = Path(__file__).parent / "speech.mp3"
+    response = client.audio.speech.create(
+        model="tts-1",
+        voice="alloy",
+        input=text
+    )
+    # with open(speech_file_path, "wb") as file:
+    #     file.write(response)
+    response.write_to_file(speech_file_path)
+
+
 
 BASE_URL = 'http://localhost:3001/api'
+# FUNCTIONS FOR INTERACTING WITH API ENDPOINTS
 
 def fetch_medications():
     response = requests.get(f'{BASE_URL}/medications')
@@ -34,6 +82,17 @@ def main():
 
     # Fetch medications command
     subparsers.add_parser('fetch', help='Fetch all medications')
+    
+    # Generate text command
+    subparsers.add_parser('generate', help='Generate text from prompt')
+    
+    # Transcribe audio command
+    subparsers.add_parser('transcribe', help='Transcribe audio')
+    
+
+    # Text to audio command
+    subparsers.add_parser('text_to_audio', help='Convert text to audio')
+    
 
     # Add medication command
     add_parser = subparsers.add_parser('add', help='Add a new medication')
@@ -53,8 +112,23 @@ def main():
         add_medication(args.name, args.dosage, args.time)
     elif args.command == 'delete':
         delete_medication(args.id)
+    
+    elif args.command == 'generate':
+        prompt = input("Enter a prompt: ")
+        response = generate_response(prompt)
+        print(response)
+        text_to_audio(str(response))
+    elif args.command == 'transcribe':
+        audio_file = open("speech.mp3", "rb")
+        transcript = audio_to_text(audio_file)
+        print(transcript)
+    elif args.command == 'text_to_audio':
+        text = input("Enter text to convert to audio: ")
+        text_to_audio(text)
     else:
         parser.print_help()
+
+
 
 if __name__ == '__main__':
     main()
