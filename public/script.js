@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+    setupViewButtons();
+    //setupSpeechRecognition();
+});
+
+function setupViewButtons() {
     const showMedicationsBtn = document.getElementById('show-medications');
     const showCalendarBtn = document.getElementById('show-calendar');
     const showTodosBtn = document.getElementById('show-todos');
@@ -9,8 +14,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     showCalendarBtn.addEventListener('click', () => switchView('calendar-view'));
     showTodosBtn.addEventListener('click', () => switchView('todos-view'));
-});
+}
 
+
+// SPEECH RECOGNITION FUNCTIONS
+// DELETE IS REMOVE SPEECH RECOGNITION FROM WEBPAGE
+function setupSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+
+    recognition.continuous = true;
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    
+    recognition.onstart = () => {
+        console.log('Voice recognition activated. Start speaking.');
+    };
+
+    recognition.onresult = (event) => {
+        const last = event.results.length - 1;
+        const text = event.results[last][0].transcript.trim().toLowerCase();
+        console.log("Recognized text:", text);
+
+        if (text.includes("love")) {
+            console.log("Keyword 'love' recognized.");
+            keywordAction();
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error', event.error);
+    };
+
+    recognition.start();
+}
+
+function keywordAction() {
+    console.log('Performing keyword action');
+    switchView('calendar-view');
+}
+
+
+// VIEW FUNCTIONS
 function switchView(viewId) {
     const views = document.querySelectorAll('.view');
     views.forEach(view => view.style.display = 'none'); // Hide all views
@@ -18,6 +63,8 @@ function switchView(viewId) {
     const selectedView = document.getElementById(viewId);
     selectedView.style.display = 'block'; // Show the selected view
 }
+
+// MEDICATION FUNCTIONS
 
 function fetchMedicationsAndUpdateView() {
     fetch('/api/medications')
