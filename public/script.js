@@ -110,3 +110,24 @@ function deleteMedication(id) {
         })
         .catch(error => console.error('Error deleting medication:', error));
 }
+
+
+function updateTime() {
+    const now = new Date(); // Get the current time
+    let hours = now.getHours(); // Get hours from the current time
+    let minutes = now.getMinutes(); // Get minutes from the current time
+
+    // Format hours and minutes to ensure two digits
+    hours = hours.toString().padStart(2, '0');
+    minutes = minutes.toString().padStart(2, '0');
+
+    // Combine hours and minutes in hh:mm format
+    const timeString = `${hours}:${minutes}`;
+
+    // Update the div with id='time-display' with the current time
+    document.getElementById('time-display').textContent = timeString;
+}
+
+// Call updateTime() function every minute to keep the time updated
+updateTime(); // Update time immediately when the page loads
+setInterval(updateTime, 60000); // Then update it every 60 seconds

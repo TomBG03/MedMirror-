@@ -13,7 +13,6 @@ MODEL = "gpt-3.5-turbo"
 client = OpenAI(api_key=API_KEY)
 
 def audio_to_text(audio_file):
-    #audio_file= open("/path/to/file/audio.mp3", "rb")
     transcript = client.audio.transcriptions.create(
         model="whisper-1", 
         file=audio_file
@@ -88,20 +87,10 @@ def main():
     parser = argparse.ArgumentParser(description='Medications Client')
     subparsers = parser.add_subparsers(dest='command')
 
+
     # Fetch medications command
     subparsers.add_parser('fetch', help='Fetch all medications')
     
-    # Generate text command
-    subparsers.add_parser('generate', help='Generate text from prompt')
-    
-    # Transcribe audio command
-    subparsers.add_parser('transcribe', help='Transcribe audio')
-    
-
-    # Text to audio command
-    subparsers.add_parser('text_to_audio', help='Convert text to audio')
-    
-
     # Add medication command
     add_parser = subparsers.add_parser('add', help='Add a new medication')
     add_parser.add_argument('name', help='Name of the medication')
@@ -111,6 +100,19 @@ def main():
     # Delete medication command
     delete_parser = subparsers.add_parser('delete', help='Delete a medication by its ID')
     delete_parser.add_argument('id', help='The ID of the medication to delete')
+    
+
+
+    # Generate text command
+    subparsers.add_parser('generate', help='Generate text from prompt')
+    
+    # Transcribe audio command
+    subparsers.add_parser('transcribe', help='Transcribe audio')
+    
+    # Text to audio command
+    subparsers.add_parser('text_to_audio', help='Convert text to audio')
+
+
 
     args = parser.parse_args()
 
@@ -127,7 +129,7 @@ def main():
         print(response)
         text_to_audio(str(response))
     elif args.command == 'transcribe':
-        audio_file = open("speech.mp3", "rb")
+        audio_file = open("input.mp3", "rb")
         transcript = audio_to_text(audio_file)
         print(transcript)
     elif args.command == 'text_to_audio':
