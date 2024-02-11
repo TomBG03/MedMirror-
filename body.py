@@ -3,14 +3,17 @@ import argparse
 from openai import OpenAI
 from pathlib import Path
 import os 
-
-
+import sounddevice as sd
+from scipy.io.wavfile import write
+import numpy as np
+from playsound import playsound
 
 API_KEY = os.getenv('OPENAI_API_KEY')
 MODEL = "gpt-3.5-turbo"
-
+MESSAGES = [{"role": "system", "content": "You are a helpful assistant designed to provide a friendly response and help the user with tasks. When necessary updating the users medication list"},]
 
 client = OpenAI(api_key=API_KEY)
+
 
 def audio_to_text(audio_file):
     transcript = client.audio.transcriptions.create(
@@ -25,15 +28,10 @@ def audio_to_text(audio_file):
 # sometimes a response may not be needed from the chatbot i.e. show calendar 
 
 
-
 def generate_response(prompt):
     response = client.chat.completions.create(
         model=MODEL,
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant designed to provide a friendly response and help the user with tasks. When necessary updating the users medication list"},
-            {"role": "user", "content": prompt}
-        ]
-
+        messages=MESSAGES
     )
 
     # debug print statement
@@ -83,10 +81,36 @@ def delete_medication(medication_id):
     else:
         print("Failed to delete medication")
 
+
+def record_audio(duration=5, fs=44100, filename='output.wav'):
+    """
+    Record audio from the microphone and save it to a file.
+    
+    Parameters:
+    - duration: Length of the recording in seconds
+    - fs: Sampling frequency
+    - filename: Name of the file where the recording will be saved
+    """
+    print("Recording...")
+    myrecording = sd.rec(int(duration * fs), samplerate=fs, channels=1, dtype='float64')
+    sd.wait()  # Wait until recording is finished
+    print("Finished recording. Saving file...")
+    write(filename, fs, np.int16(myrecording * 32767))
+    print(f"File saved as {filename}")
+
+
+
+
 def main():
     parser = argparse.ArgumentParser(description='Medications Client')
     subparsers = parser.add_subparsers(dest='command')
 
+
+    # send a message to the chatbot
+    subparsers.add_parser('chat', help='Send a message to the chatbot')
+
+    # record user audio 
+    subparsers.add_parser('record', help='Record audio')
 
     # Fetch medications command
     subparsers.add_parser('fetch', help='Fetch all medications')
@@ -123,8 +147,25 @@ def main():
     elif args.command == 'delete':
         delete_medication(args.id)
     
+    elif args.command == 'record':
+        record_audio()
+
+    elif args.command == 'chat':
+        while True:
+            record_audio()
+            audio_file = open("output.wav", "rb")
+            transcript = audio_to_text(audio_file)
+            if "exit" in transcript.lower():
+                break
+            MESSAGES.append({"role": "user", "content": transcript})
+            response = generate_response(transcript)
+            MESSAGES.append({"role": "assistant", "content": response})
+            text_to_audio(str(response))
+            playsound("speech.mp3")
+
     elif args.command == 'generate':
         prompt = input("Enter a prompt: ")
+        MESSAGES.append({"role": "user", "content": prompt})
         response = generate_response(prompt)
         print(response)
         text_to_audio(str(response))
@@ -142,3 +183,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
+
