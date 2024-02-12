@@ -3,7 +3,7 @@ body {
     background-color: #333;
     color: white;
     margin: 0;
-    padding: 0;
+    padding: 5px;
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -44,8 +44,9 @@ footer {
 
 /* Additions */
 .view {
-    display: none; /* Initially hide all views */
+    display: medications-view; /* Initially display medications view */
 }
+
 
 #navigation button {
     margin-right: 10px;
@@ -54,7 +55,8 @@ footer {
 
 #time-display {
     font-size: 3em; /* Makes the time larger */
-    margin-top: 20px; /* Adds space above the time display */
+    margin-top: 30px; /* Adds space above the time display */
+    padding: 10px;
     text-align: center; /* Centers the time text */
     width: 100%; /* Ensures it spans the full container width */
     position: absolute; /* Positions it at the top */

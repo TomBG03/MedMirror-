@@ -129,5 +129,6 @@ function updateTime() {
 }
 
 // Call updateTime() function every minute to keep the time updated
+fetchMedicationsAndUpdateView()
 updateTime(); // Update time immediately when the page loads
 setInterval(updateTime, 60000); // Then update it every 60 seconds

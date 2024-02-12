@@ -10,7 +10,9 @@ from playsound import playsound
 
 API_KEY = os.getenv('OPENAI_API_KEY')
 MODEL = "gpt-3.5-turbo"
-MESSAGES = [{"role": "system", "content": "You are a helpful assistant designed to provide a friendly response and help the user with tasks. When necessary updating the users medication list"},]
+MESSAGES = [
+    {"role": "system", "content": "You are a helpful assistant designed to provide a friendly response and help the user with questions. The medications provided are the medications prescribed by the doctor which the user shoudl take. The dosage and time have been set by a medical professional. When asked about medication please refer to provided info"},
+    ]
 
 client = OpenAI(api_key=API_KEY)
 
@@ -28,10 +30,10 @@ def audio_to_text(audio_file):
 # sometimes a response may not be needed from the chatbot i.e. show calendar 
 
 
-def generate_response(prompt):
+def generate_response():
     response = client.chat.completions.create(
         model=MODEL,
-        messages=MESSAGES
+        messages=MESSAGES,
     )
 
     # debug print statement
@@ -56,15 +58,21 @@ def text_to_audio(text):
 BASE_URL = 'http://localhost:3001/api'
 # FUNCTIONS FOR INTERACTING WITH API ENDPOINTS
 
-def fetch_medications():
+def get_medications():
+    meds = []
     response = requests.get(f'{BASE_URL}/medications')
     if response.status_code == 200:
         medications = response.json()
         for medication in medications:
-            med_id = medication['_id']
-            print(f"{med_id} : {medication['name']} - {medication['dosage']} - {medication['time']}")
-    else:
-        print("Failed to fetch medications")
+            meds.append(medication)
+    #         med_id = medication['_id']
+    #         #print(f"{med_id} : {medication['name']} - {medication['dosage']} - {medication['time']}")
+    #         meds.append(f"{med_id} : {medication['name']} - {medication['dosage']} - {medication['time']}")
+    # else:
+    #     return (f"You have no medications")
+    # return meds
+    return medications
+    
 
 def add_medication(name, dosage, time):
     medication = {'name': name, 'dosage': dosage, 'time': time}
@@ -141,7 +149,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == 'fetch':
-        fetch_medications()
+        get_medications()
     elif args.command == 'add':
         add_medication(args.name, args.dosage, args.time)
     elif args.command == 'delete':
@@ -158,15 +166,23 @@ def main():
             if "exit" in transcript.lower():
                 break
             MESSAGES.append({"role": "user", "content": transcript})
-            response = generate_response(transcript)
-            MESSAGES.append({"role": "assistant", "content": response})
+            response = generate_response()
             text_to_audio(str(response))
+            MESSAGES.append({"role": "assistant", "content": response})
             playsound("speech.mp3")
 
     elif args.command == 'generate':
         prompt = input("Enter a prompt: ")
-        MESSAGES.append({"role": "user", "content": prompt})
-        response = generate_response(prompt)
+        if "medication" in prompt:
+            med_info = "current medications (in format name - dosage - time)"
+            medications = get_medications()
+            for medication in medications:
+                #print(f"{medications['_id']} : {medication['name']} - {medication['dosage']} - {medication['time']}")
+                med_info = med_info + f"{medication['name']} - {medication['dosage']} - {medication['time']}"
+            MESSAGES.append({"role": "user", "content": prompt + med_info})
+        else:
+            MESSAGES.append({"role": "user", "content": prompt})
+        response = generate_response()
         print(response)
         text_to_audio(str(response))
     elif args.command == 'transcribe':
