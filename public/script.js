@@ -12,46 +12,12 @@ function setupViewButtons() {
         switchView('medications-view');
         fetchMedicationsAndUpdateView(); // Fetch medications when the view is switched to
     });
-    showCalendarBtn.addEventListener('click', () => switchView('calendar-view'));
-    showTodosBtn.addEventListener('click', () => switchView('todos-view'));
-}
-
-
-// SPEECH RECOGNITION FUNCTIONS
-// DELETE IS REMOVE SPEECH RECOGNITION FROM WEBPAGE
-function setupSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-
-    recognition.continuous = true;
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
+    showCalendarBtn.addEventListener('click', () => {
+        switchView('calendar-view');
+        generateCalendar(); // Generate the calendar when the view is switched to
+    });
     
-    recognition.onstart = () => {
-        console.log('Voice recognition activated. Start speaking.');
-    };
-
-    recognition.onresult = (event) => {
-        const last = event.results.length - 1;
-        const text = event.results[last][0].transcript.trim().toLowerCase();
-        console.log("Recognized text:", text);
-
-        if (text.includes("love")) {
-            console.log("Keyword 'love' recognized.");
-            keywordAction();
-        }
-    };
-
-    recognition.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-    };
-
-    recognition.start();
-}
-
-function keywordAction() {
-    console.log('Performing keyword action');
-    switchView('calendar-view');
+    showTodosBtn.addEventListener('click', () => switchView('todos-view'));
 }
 
 
@@ -111,24 +77,73 @@ function deleteMedication(id) {
         .catch(error => console.error('Error deleting medication:', error));
 }
 
+function generateCalendar() {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
 
-function updateTime() {
-    const now = new Date(); // Get the current time
-    let hours = now.getHours(); // Get hours from the current time
-    let minutes = now.getMinutes(); // Get minutes from the current time
+    const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
 
-    // Format hours and minutes to ensure two digits
-    hours = hours.toString().padStart(2, '0');
-    minutes = minutes.toString().padStart(2, '0');
+    const dateString = firstDayOfMonth.toLocaleDateString('en-us', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+    });
+    const paddingDays = weekdays.indexOf(dateString.split(', ')[0]);
 
-    // Combine hours and minutes in hh:mm format
-    const timeString = `${hours}:${minutes}`;
+    const totalSquares = Math.ceil((paddingDays + daysInMonth) / 7) * 7; // Total cells to fill a complete grid
 
-    // Update the div with id='time-display' with the current time
-    document.getElementById('time-display').textContent = timeString;
+    document.querySelector(".calendar-body").innerHTML = '';
+    
+    for(let i = 1; i <= totalSquares; i++) {
+        const daySquare = document.createElement("div");
+        daySquare.classList.add("day");
+        
+        if (i > paddingDays && i <= paddingDays + daysInMonth) {
+            // Current month's days
+            daySquare.innerText = i - paddingDays;
+            daySquare.addEventListener('click', () => console.log(`${currentMonth + 1}/${i - paddingDays}/${currentYear}`));
+        } else if (i > paddingDays + daysInMonth) {
+            // Next month's days
+            daySquare.innerText = i - (paddingDays + daysInMonth);
+            daySquare.classList.add("next-month");
+            // Optionally add a different event listener or styling for next month's days
+        } else {
+            // Preceding month's padding days
+            daySquare.classList.add("padding");
+        }
+
+        document.querySelector(".calendar-body").appendChild(daySquare);    
+    }
 }
 
+const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+
+
+function updateDateTime() {
+    const now = new Date();
+    let hours = now.getHours();
+    let minutes = now.getMinutes();
+    hours = hours.toString().padStart(2, '0');
+    minutes = minutes.toString().padStart(2, '0');
+    const timeString = `${hours}:${minutes}`;
+
+    // Format the date to include the month name
+    const options = { month: 'long', day: 'numeric', year: 'numeric' };
+    const dateString = now.toLocaleDateString('en-US', options);
+
+    document.getElementById('time-display').textContent = timeString;
+    document.getElementById('date-display').textContent = dateString;
+    
+}
+
+    
+
 // Call updateTime() function every minute to keep the time updated
+
 fetchMedicationsAndUpdateView()
-updateTime(); // Update time immediately when the page loads
+updateDateTime(); // Update time immediately when the page loads
 setInterval(updateTime, 60000); // Then update it every 60 seconds

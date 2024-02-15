@@ -9,6 +9,15 @@ import numpy as np
 from playsound import playsound
 
 API_KEY = os.getenv('OPENAI_API_KEY')
+# client_id = os.getenv('CLIENT_ID')
+# client_secret = os.getenv('CLIENT_SECRET')
+# tennant_id = os.getenv('TENANT_ID')
+CLIENT_ID = "a5b0dcf9-41c8-455c-bfac-c7cfa4a4cf8b"
+TENNANT_ID = "f8cdef31-a31e-4b4a-93e4-5f571e91255a"
+CLIENT_SECRET = "xdU8Q~LreG4f.pVTirI7uguXsAUiS-pL_rkJkau-"
+client_id = CLIENT_ID
+client_secret = CLIENT_SECRET
+tennant_id = TENNANT_ID
 MODEL = "gpt-3.5-turbo"
 MESSAGES = [
     {"role": "system", "content": "You are a helpful assistant designed to provide a friendly response and help the user with questions. The medications provided are the medications prescribed by the doctor which the user shoudl take. The dosage and time have been set by a medical professional. When asked about medication please refer to provided info"},
@@ -17,12 +26,40 @@ MESSAGES = [
 client = OpenAI(api_key=API_KEY)
 
 
+def get_access_token(client_id, tenant_id, client_secret):
+    url = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    body = {
+        "client_id": client_id,
+        "scope": "https://graph.microsoft.com/.default",
+        "client_secret": client_secret,
+        "grant_type": "client_credentials"
+    }
+
+    response = requests.post(url, headers=headers, data=body)
+    response_json = response.json()
+    print(response_json)
+    access_token = response_json.get("access_token")
+    return access_token
+
+def get_outlook_events(access_token):
+    url = "https://graph.microsoft.com/v1.0/me/events"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    response = requests.get(url, headers=headers)
+    events = response.json()
+    print(events)
+    return events
+
 def audio_to_text(audio_file):
     transcript = client.audio.transcriptions.create(
         model="whisper-1", 
         file=audio_file
     )
     return transcript.text
+
 
 # Create a messages array with the system message and the user message
 # This will allow a more natural converation with the chatbot
@@ -58,6 +95,23 @@ def text_to_audio(text):
 BASE_URL = 'http://localhost:3001/api'
 # FUNCTIONS FOR INTERACTING WITH API ENDPOINTS
 
+def get_info():
+    meds = get_medications()
+
+    # Update system with new information when needed 
+    # For example: A new medication has been added 
+
+def add_event(title, startTime, endTime, description=None, location=None, attendees=None):
+    
+    event = {'Title': title, 'description': description, 'location': location, 'startTime': startTime, 'endTime': endTime, 'attendees': attendees}
+    response = requests.post(f'{BASE_URL}/calendar', json=event)
+    if response.status_code == 201:
+        print("Event added:", response.json())
+    else:
+        print("Failed to add event")
+
+
+
 def get_medications():
     meds = []
     response = requests.get(f'{BASE_URL}/medications')
@@ -71,7 +125,7 @@ def get_medications():
     # else:
     #     return (f"You have no medications")
     # return meds
-    return medications
+    return meds
     
 
 def add_medication(name, dosage, time):
@@ -107,18 +161,55 @@ def record_audio(duration=5, fs=44100, filename='output.wav'):
     print(f"File saved as {filename}")
 
 
+def get_calendar_events():
+    access_token = get_access_token(client_id, tennant_id, client_secret)
+    print(f"ACCESS TOKEN: {access_token}")
+    events = get_outlook_events(access_token)
+    print(events)
 
+def generate():
+    prompt = input("Enter a prompt: ")
+    if "medication" in prompt:
+        med_info = "current medications (in format name - dosage - time)"
+        medications = get_medications()
+        for medication in medications:
+            #print(f"{medications['_id']} : {medication['name']} - {medication['dosage']} - {medication['time']}")
+            med_info = med_info + f"{medication['name']} - {medication['dosage']} - {medication['time']}"
+        MESSAGES.append({"role": "user", "content": prompt + med_info})
+    else:
+        MESSAGES.append({"role": "user", "content": prompt})
+    response = generate_response()
+    print(response)
+    text_to_audio(str(response))
+    
+def chat():
+    while True:
+        record_audio()
+        audio_file = open("output.wav", "rb")
+        transcript = audio_to_text(audio_file)
+        if "exit" in transcript.lower():
+            break
+        MESSAGES.append({"role": "user", "content": transcript})
+        response = generate_response()
+        text_to_audio(str(response))
+        MESSAGES.append({"role": "assistant", "content": response})
+        playsound("speech.mp3")
 
 def main():
     parser = argparse.ArgumentParser(description='Medications Client')
     subparsers = parser.add_subparsers(dest='command')
 
+    # get outlook events
+    subparsers.add_parser('calendar', help='Fetch all calendar events')
 
     # send a message to the chatbot
     subparsers.add_parser('chat', help='Send a message to the chatbot')
 
     # record user audio 
     subparsers.add_parser('record', help='Record audio')
+
+    # add calendar event command
+    subparsers.add_parser('add_event', help='add calendar event')
 
     # Fetch medications command
     subparsers.add_parser('fetch', help='Fetch all medications')
@@ -155,36 +246,25 @@ def main():
     elif args.command == 'delete':
         delete_medication(args.id)
     
+    elif args.command == 'calendar':
+        get_calendar_events()
+
+    elif args.command == 'add_event':
+        title = input('Name of event')
+        startTime = input('start time')
+        endTime = input('end time')
+        add_event(title=title, startTime=startTime, endTime=endTime)
+
+
     elif args.command == 'record':
         record_audio()
 
     elif args.command == 'chat':
-        while True:
-            record_audio()
-            audio_file = open("output.wav", "rb")
-            transcript = audio_to_text(audio_file)
-            if "exit" in transcript.lower():
-                break
-            MESSAGES.append({"role": "user", "content": transcript})
-            response = generate_response()
-            text_to_audio(str(response))
-            MESSAGES.append({"role": "assistant", "content": response})
-            playsound("speech.mp3")
+        chat()
 
     elif args.command == 'generate':
-        prompt = input("Enter a prompt: ")
-        if "medication" in prompt:
-            med_info = "current medications (in format name - dosage - time)"
-            medications = get_medications()
-            for medication in medications:
-                #print(f"{medications['_id']} : {medication['name']} - {medication['dosage']} - {medication['time']}")
-                med_info = med_info + f"{medication['name']} - {medication['dosage']} - {medication['time']}"
-            MESSAGES.append({"role": "user", "content": prompt + med_info})
-        else:
-            MESSAGES.append({"role": "user", "content": prompt})
-        response = generate_response()
-        print(response)
-        text_to_audio(str(response))
+        generate()
+
     elif args.command == 'transcribe':
         audio_file = open("input.mp3", "rb")
         transcript = audio_to_text(audio_file)

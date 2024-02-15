@@ -6,14 +6,16 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div id="time-date-display">
+        <div id="time-display">00:00</div>
+        <div id="date-display">DAY MONTH YEAR</div>
+    </div>
 
-<div id="navigation">
+    <div id="navigation">
     <button id="show-medications">Medications</button>
     <button id="show-calendar">Calendar</button>
     <button id="show-todos">To-Do List</button>
 </div>
-
-<div id="time-display">00:00</div>
 
 <div id="views">
     <section id="medications-view" class="view">
@@ -25,15 +27,25 @@
         <ul></ul>
     </section>
     <section id="calendar-view" class="view" style="display: none;">
-        <h2>Calendar</h2>
-        <p>This is a placeholder for calendar events.</p>
+        <p id="calendar-month">Month</p>
+        <div id="calendar">
+            <div class="calendar-header">
+                <div>Mon</div>
+                <div>Tue</div>
+                <div>Wed</div>
+                <div>Thu</div>
+                <div>Fri</div>
+                <div>Sat</div>
+                <div>Sun</div>
+            </div>
+            <div class="calendar-body"></div>
+        </div>
     </section>
     <section id="todos-view" class="view" style="display: none;">
         <h2>To-Do List</h2>
         <p>This is a placeholder for to-do items.</p>
     </section>
 </div>
-
 <script src="script.js"></script>
 </body>
 </html>
