@@ -98,7 +98,7 @@ class Graph:
     # </SendMailSnippet>
 
     # <MakeGraphCallSnippet>
-    async def make_graph_call(self):
+    async def get_calendar_events(self):
         today = datetime.now().strftime("%Y-%m-%d")
         
         query_params = EventsRequestBuilder.EventsRequestBuilderGetQueryParameters(

@@ -146,4 +146,5 @@ function updateDateTime() {
 
 fetchMedicationsAndUpdateView()
 updateDateTime(); // Update time immediately when the page loads
-setInterval(updateTime, 60000); // Then update it every 60 seconds
+setInterval(updateTime, 30000);
+setInterval(fetchMedicationsAndUpdateView, 5000); // Then update it every 60 seconds

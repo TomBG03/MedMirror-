@@ -22,3 +22,5 @@ Thumbs.db
 
 # Optional: build artifacts directory
 /build
+
+vosk-model-*/
