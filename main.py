@@ -8,7 +8,7 @@ from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from graph import Graph
 
 async def main():
-    print('Python Graph Tutorial\n')
+    print('Outlook API\n')
 
     # Load settings
     config = configparser.ConfigParser()

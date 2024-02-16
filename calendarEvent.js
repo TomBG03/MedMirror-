@@ -1,17 +1,20 @@
 const mongoose = require('mongoose');
 
+
+// select=["subject", "organizer", "attendees", "start", "end", "location"]
+
 const calendarEventSchema = new mongoose.Schema({
-  title: {
+  subject: {
     type: String,
     required: true
   },
   description: String,
   location: String,
-  startTime: {
+  start: {
     type: Date,
     required: true
   },
-  endTime: {
+  end: {
     type: Date,
     required: true
   },
