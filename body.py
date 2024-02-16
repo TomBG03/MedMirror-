@@ -30,19 +30,19 @@ def audio_to_text(audio_file):
     )
     return transcript.text
 
-def generate_function_response():
+def generate_function_response(messages):
     response = client.chat.completions.create(
         model=MODEL,
-        messages=MESSAGES,
+        messages=messages,
         tools=TOOLS,
         tool_choice='auto'
     )
     return response.choices[0].message
 
-def generate_chat_response():
+def generate_chat_response(messages):
     response = client.chat.completions.create(
         model=MODEL,
-        messages=MESSAGES,
+        messages=messages,
     )
     return response.choices[0].message.content
 
@@ -119,25 +119,28 @@ TOOLS = [
 ##########################################
 # EXECUTING FUNCTIONS FOR CHATBOT API    #
 ##########################################
-def execute_function_call(message):
-    func = message.tool_calls[0].function.name
-    if func == "get_medications":
-        results = get_medications()
+def execute_function_call(tool_call):
+    # Assume tool_call is a single ChatCompletionMessageToolCall object
+    func_name = tool_call.function.name  # Directly access the function name
 
-    elif func == "add_medication":
-        name = json.loads(message.tool_calls[0].function.arguments)["name"]
-        dosage = json.loads(message.tool_calls[0].function.arguments)["dosage"]
-        time = json.loads(message.tool_calls[0].function.arguments)["time"]
+    # Process the function call based on its name
+    if func_name == "get_medications":
+        results = get_medications()
+    elif func_name == "add_medication":
+        args = json.loads(tool_call.function.arguments)
+        name = args["name"]
+        dosage = args["dosage"]
+        time = args["time"]
         results = add_medication(name, dosage, time)
-    elif func == "delete_medication":
-        medID = json.loads(message.tool_calls[0].function.arguments)["medication_id"]
-        results = delete_medication(medID)
+    elif func_name == "delete_medication":
+        args = json.loads(tool_call.function.arguments)
+        medication_id = args["medication_id"]
+        results = delete_medication(medication_id)
     else:
-        results = f"Error: function {message.tool_calls[0].function.name} does not exist"
-    
-    MESSAGES.append({"role": "function", "tool_call_id": message.tool_calls[0].id, "name": message.tool_calls[0].function.name, "content": str(results)})
-    reply = generate_chat_response()
-    return reply 
+        results = f"Error: function {func_name} does not exist"
+
+    return results
+ 
 
 ##########################################
 
@@ -208,32 +211,41 @@ def delete_medication(medication_id):
 MESSAGES = [
     {"role": "system", "content": "You are a friendly assistant here to help you with your health and wellness needs."},
     {"role": "system", "content": "You can ask me about your medications, schedule, and general health questions."},
-    {"role": "system", "content": "Don't make assumptions about what values to plug into functions. Ask for clarification if a user request is ambiguous."},
     {"role": "system", "content": "You can also add new medications to your list or delete existing ones."},
     {"role": "system", "content": "You can also ask me to schedule appointments for you."},
     {"role": "system", "content": "If you need to exit, just say 'exit'"},
+    {"role": "system", "content": "Don't make assumptions about what values to plug into functions. Ask for clarification if a user request is ambiguous, do not make a funciton call if the user does not provide required informaiton to do so"},
 ]
 
 
 KEEP_CHATTING = True
 
 def generate():
-    global MESSAGES
-    prompt = input("Enter a prompt: ")
-    MESSAGES.append({"role": "user", "content": prompt})
-    assistant_message = generate_function_response()
-    if assistant_message.tool_calls:
-        print(assistant_message.tool_calls[0].function)
-        assistant_message.content = str(assistant_message.tool_calls[0].function)
-        MESSAGES.append({"role": assistant_message.role, "content": assistant_message.content})
-        reply = execute_function_call(assistant_message)
-        MESSAGES.append({"role": "assistant", "content": reply})
-    else:
-        assistant_message = generate_chat_response()
-        MESSAGES.append({"role": "assistant", "content": assistant_message})
-    pretty_print_conversation(MESSAGES)
-    if KEEP_CHATTING:
-        generate()
+    while True:
+        global MESSAGES
+        prompt = input("Enter a prompt: ")
+        if prompt.lower() == "exit":
+            break
+        
+        MESSAGES.append({"role": "user", "content": prompt})
+        assistant_message = generate_function_response(MESSAGES)
+        
+        if hasattr(assistant_message, 'tool_calls') and assistant_message.tool_calls:
+            for call in assistant_message.tool_calls:
+                results = execute_function_call(call)  # Adjust this function to accept an individual tool call
+                # Here, ensure you're appending results correctly to MESSAGES
+                MESSAGES.append({"role": "function", "tool_call_id": call.id, "name": call.function.name, "content": str(results)})
+            
+            # Generate and append the assistant's reply after processing all tool calls
+            reply = generate_chat_response(MESSAGES)
+            MESSAGES.append({"role": "assistant", "content": reply})
+        else:
+            # Directly generate a chat response for prompts that don't result in tool calls
+            assistant_message = generate_chat_response(MESSAGES)
+            MESSAGES.append({"role": "assistant", "content": assistant_message})
+        
+        pretty_print_conversation(MESSAGES)
+    
         
 
 
@@ -265,13 +277,29 @@ def chat():
         record_audio()
         audio_file = open("output.wav", "rb")
         transcript = audio_to_text(audio_file)
-        if "exit" in transcript.lower():
-            break
         MESSAGES.append({"role": "user", "content": transcript})
-        response = generate_response()
-        text_to_audio(str(response))
-        MESSAGES.append({"role": "assistant", "content": response})
+        assistant_message = generate_function_response(MESSAGES)
+        if assistant_message.tool_calls:
+            for call in assistant_message.tool_calls:
+                print(call)
+                print(assistant_message.tool_calls[0].function)
+                assistant_message.content = str(assistant_message.tool_calls[0].function)
+                MESSAGES.append({"role": assistant_message.role, "content": assistant_message.content})
+                results = execute_function_call(assistant_message)
+                MESSAGES.append({"role": "function", "tool_call_id": assistant_message.tool_calls[0].id, "name": assistant_message.tool_calls[0].function.name, "content": str(results)})
+            reply = generate_chat_response(MESSAGES)
+            MESSAGES.append({"role": "assistant", "content": reply})
+            print(reply)
+            text_to_audio(str(reply))
+        else:
+            assistant_message = generate_chat_response(MESSAGES)
+            MESSAGES.append({"role": "assistant", "content": assistant_message})
+            print(assistant_message)
+            text_to_audio(str(assistant_message))
+        #pretty_print_conversation(MESSAGES)
         playsound("speech.mp3")
+        if KEEP_CHATTING == False:
+            break
 
 def main():
     parser = argparse.ArgumentParser(description='Medications Client')
@@ -323,16 +351,6 @@ def main():
         add_medication(args.name, args.dosage, args.time)
     elif args.command == 'delete':
         delete_medication(args.id)
-    
-    # elif args.command == 'calendar':
-    #     get_calendar_events()
-
-    elif args.command == 'add_event':
-        title = input('Name of event')
-        startTime = input('start time')
-        endTime = input('end time')
-        add_event(title=title, startTime=startTime, endTime=endTime)
-
 
     elif args.command == 'record':
         record_audio()
