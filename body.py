@@ -57,6 +57,7 @@ def text_to_audio(text):
     response.write_to_file(speech_file_path)
 ##########################################
 
+ 
 ##########################################
 # DEFINING WHAT FUNCTIONS FOR CHATBOT   #
 #           API TO EXECUTE              #     
@@ -93,7 +94,7 @@ TOOLS = [
                 "required": ["name", "dosage", "time"]
             },
         }
-    },
+    }, 
     {
         "type": "function",
         "function": {
@@ -137,9 +138,6 @@ def execute_function_call(message):
     MESSAGES.append({"role": "function", "tool_call_id": message.tool_calls[0].id, "name": message.tool_calls[0].function.name, "content": str(results)})
     reply = generate_chat_response()
     return reply 
-
-
-
 
 ##########################################
 
