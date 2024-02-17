@@ -107,7 +107,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "delete_medication",
-            "description": "delete/remove a medication from the user's list of medications by its ID",
+            "description": "delete/remove a medication from the user's list of medications by its medication_id",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -118,6 +118,13 @@ TOOLS = [
                 },
                 "required": ["medication_id"]
             },
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "end_conversation",
+            "description": "Ends the current conversation with the user",
         }
     }
 ]
@@ -145,6 +152,8 @@ def execute_function_call(tool_call):
         args = json.loads(tool_call.function.arguments)
         medication_id = args["medication_id"]
         results = delete_medication(medication_id)
+    elif func_name == "end_conversation":
+        results = "Conversation ended. Goodbye!"
     else:
         results = f"Error: function {func_name} does not exist"
     return results
@@ -244,31 +253,16 @@ def record_audio_to_file(output_filename, stream, rec, silence_duration=2):
 
     wf.close()  # Close the wave file
 
-def listen_and_record(keyword="activate", model_path="/Users/annushka/Documents/GitHub/MedMirror-/vosk-model-en-us-0.22", output_filename="output.wav"):
-    model = Model(model_path)
-    rec = KaldiRecognizer(model, 16000)
-    rec.SetWords(True)
+def listen_for_keyword(stream, rec, keyword="activate"):
+    print("Listening for activation keyword...")
     while True:
-        p = pyaudio.PyAudio()
-        stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=4096)
-        stream.start_stream()
-
-        print("Listening for activation keyword...")
-
-        while True:
-            data = stream.read(4096, exception_on_overflow=False)
-            if rec.AcceptWaveform(data):
-                result = json.loads(rec.Result())
-                if keyword.lower() in [word['word'].lower() for word in result.get('result', [])]:
-                    print(f"Activation keyword '{keyword}' detected. Start speaking.")
-                    record_audio_to_file(output_filename, stream, rec)
-                    break
-
-        # Stop and close the stream
-        stream.stop_stream()
-        stream.close()
-        p.terminate()
-        chat()
+        data = stream.read(4096, exception_on_overflow=False)
+        if rec.AcceptWaveform(data):
+            result = json.loads(rec.Result())
+            if keyword.lower() in [word['word'].lower() for word in result.get('result', [])]:
+                print(f"Activation keyword '{keyword}' detected.")
+                return True
+    return False
 ##########################################
 
 
@@ -413,7 +407,6 @@ MESSAGES = [
     {"role": "system", "content": "Don't make assumptions about what values to plug into functions. Ask for clarification if a user request is ambiguous, do not make a funciton call if the user does not provide required informaiton to do so"},
 ]
 
-
 def generate():
     while True:
         global MESSAGES
@@ -434,9 +427,6 @@ def generate():
             MESSAGES.append({"role": "assistant", "content": assistant_message})
         pretty_print_conversation(MESSAGES)
     
-        
-
-
 def pretty_print_conversation(messages):
     role_to_color = {
         "system": "red",
@@ -456,21 +446,72 @@ def pretty_print_conversation(messages):
             print(colored(f"assistant: {message['content']}\n", role_to_color[message["role"]]))
         elif message["role"] == "function":
             print(colored(f"function ({message['name']}): {message['content']}\n", role_to_color[message["role"]]))
-    
+
+def conversation():
+    model_path = "/Users/annushka/Documents/GitHub/MedMirror-/vosk-model-en-us-0.22"
+    output_filename = "output.wav"
+
+    model = Model(model_path)
+    rec = KaldiRecognizer(model, 16000)
+    rec.SetWords(True)
+
+    p = pyaudio.PyAudio()
+    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=4096)
+    stream.start_stream()
+
+    try:
+        while True:
+            if listen_for_keyword(stream, rec):
+                record_audio_to_file(output_filename, stream, rec)
+                chat()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        stream.stop_stream()
+        stream.close()
+        p.terminate()    
+
+
+def tester_main():
+    model_path = "/Users/annushka/Documents/GitHub/MedMirror-/vosk-model-en-us-0.22"
+    output_filename = "output.wav"
+
+    model = Model(model_path)
+    rec = KaldiRecognizer(model, 16000)
+    rec.SetWords(True)
+
+    p = pyaudio.PyAudio()
+    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=4096)
+    stream.start_stream()
+
+    try:
+        while True:
+            if listen_for_keyword(stream, rec):
+                end_of_conversation = False
+                while not end_of_conversation:
+                    record_audio_to_file(output_filename, stream, rec)
+                    end_of_conversation = chat()
+                
+            
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        stream.stop_stream()
+        stream.close()
+        p.terminate()    
 
 
 def chat():
-# while True:
-    # record_audio()
+    end_of_conversation = False
     audio_file = open("output.wav", "rb")
     transcript = audio_to_text(audio_file)
-    # if "exit" in transcript.lower():
-    #     break
     MESSAGES.append({"role": "user", "content": transcript})
     assistant_message = generate_function_response(MESSAGES)
     if hasattr(assistant_message, 'tool_calls') and assistant_message.tool_calls:
         for call in assistant_message.tool_calls:
-            results = execute_function_call(call) 
+            results = execute_function_call(call)
+            if "conversation ended" in str(results).lower():
+                end_of_conversation = True 
             MESSAGES.append({"role": "function", "tool_call_id": call.id, "name": call.function.name, "content": str(results)})
         reply = generate_chat_response(MESSAGES)
         MESSAGES.append({"role": "assistant", "content": reply})
@@ -482,7 +523,7 @@ def chat():
         print(assistant_message)
         text_to_audio(str(assistant_message))
     playsound("speech.mp3")
-
+    return end_of_conversation 
 
 ############################################
 # MAIN CONVERSATION FUNCTION               #
@@ -558,7 +599,7 @@ def main():
     elif args.command == 'chat':
         chat()
     elif args.command == 'keyword':
-        listen_and_record()
+        tester_main()
 
     elif args.command == 'generate':
         generate()
