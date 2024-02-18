@@ -17,6 +17,7 @@ from vosk import Model, KaldiRecognizer
 import pyaudio
 import wave
 import audioop
+from datetime import datetime
 
 ##########################################
 # OPEN AI API                            #
@@ -75,7 +76,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "get_medications",
-            "description": "returns a list of user's current prescribed medication in format 'medication_id: medication name - dosage - time'",
+            "description": "get user's current prescribed medications in the format 'medication_id: medication name - dosage - time'",
         }
     },
     {
@@ -124,11 +125,76 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "end_conversation",
-            "description": "Ends the current conversation with the user",
+            "description": "Ends the current conversation with the user, can be inferred from users input or silence",
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "add_calendar_event",
+            "description": "Add an event to the user's calendar, can infer details from user's input",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "subject": {
+                        "type": "string",
+                        "description": "Subject of the event",
+                    },
+                    "start": {
+                        "type": "string",
+                        "description": "Start time of the event, must be in format 'YYYY-MM-DDTHH:MM:SS'",
+                    },
+                    "end": {
+                        "type": "string",
+                        "description": "End time of the event, must be in format 'YYYY-MM-DDTHH:MM:SS",
+                    },
+                    "location": {
+                        "type": "string",
+                        "description": "Location of the event",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Description of the event",
+                    }
+                },
+                "required": ["subject", "start", "end"]
+            }
+        }
+    },
+
+    {
+        "type": "function",
+        "function": {
+            "name": "get_current_datetime",
+            "description": "Get the current date and time",
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_calendar_events",
+            "description": "get users calendar events in the format 'event_id: event subject - start time - end time - description - location'",
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_event",
+            "description": "delete/remove a calendar event from the user's calendar by using the event_id",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "event_id": {
+                        "type": "string",
+                        "description": "event id of the event to delete",
+                    },
+                },
+                "required": ["medication_id"]
+            },
         }
     }
+    
 ]
-
 ##########################################
 
 ##########################################
@@ -136,7 +202,6 @@ TOOLS = [
 ##########################################
 
 
-# Define a funciton to exit out of current conversation, only listen for keyword when not in a conversation
 def execute_function_call(tool_call):
     func_name = tool_call.function.name 
     if func_name == "get_medications":
@@ -147,13 +212,35 @@ def execute_function_call(tool_call):
         dosage = args["dosage"]
         time = args["time"]
         results = add_medication(name, dosage, time)
-
     elif func_name == "delete_medication":
         args = json.loads(tool_call.function.arguments)
         medication_id = args["medication_id"]
         results = delete_medication(medication_id)
+
+
+
+
+    elif func_name == "get_calendar_events":
+        results = get_calendar_events()
+
+    elif func_name == "add_calendar_event":
+        args = json.loads(tool_call.function.arguments)
+        subject = args["subject"]
+        start = args["start"]
+        end = args["end"]
+        location = args.get("location", None)
+        description = args.get("description", None)
+        results = add_calendar_event(subject, start, end, location, description)
+    elif func_name == "delete_event":
+        args = json.loads(tool_call.function.arguments)
+        event_id = args["event_id"]
+        results = delete_calendar_event(event_id)
+
+    elif func_name == "get_current_datetime":
+        results = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     elif func_name == "end_conversation":
-        results = "Conversation ended. Goodbye!"
+        results = "Conversation ended"
     else:
         results = f"Error: function {func_name} does not exist"
     return results
@@ -232,8 +319,9 @@ def record_audio_to_file(output_filename, stream, rec, silence_duration=2):
 
     # Initialize variables for tracking silence
     num_silent_frames = 0
-    max_silent_frames = int(16000 / 4096 * silence_duration)  # Convert silence duration to number of frames
 
+    #  rate / chunk * no.seconds for no. seconds of silence
+    max_silent_frames = int(16000 / 4096 * silence_duration)  
     while True:
         data = stream.read(4096, exception_on_overflow=False)
         wf.writeframes(data)  # Write audio data to file
@@ -392,6 +480,42 @@ def delete_medication(medication_id):
         return("Failed to delete medication, would you like me to try again?")
 
 ##########################################
+# Calendar API ENDPOINTS                 #
+##########################################
+
+def get_calendar_events():
+    myEvents = []
+    response = requests.get(f'{BASE_URL}/calendar')
+    if response.status_code == 200:
+        events = response.json()
+        for event in events:
+            event_id = event['_id']
+            if event['location']:
+                myEvents.append(f"{event_id} : {event['subject']} - {event['start']} - {event['end']} - {event['location']}")
+            else:
+                myEvents.append(f"{event} : {event['subject']} - {event['start']} - {event['end']} - No location")
+    return myEvents
+
+
+def add_calendar_event(subject, start, end, location, description):
+    event = {'subject': subject, 'start': start, 'end': end, 'location': location, 'description': description}
+    response = requests.post(f'{BASE_URL}/calendar', json=event)
+    if response.status_code == 201:
+        return("Medication added:", response.json())
+    else:
+        return("Failed to add calendar event")
+
+def delete_calendar_event(event_id):
+    response = requests.delete(f'{BASE_URL}/calendar/{event_id}')
+    if response.status_code == 200:
+        return("Event deleted")
+    else:
+        return("Failed to delete event, would you like me to try again?")
+
+
+
+
+##########################################
 
 
 
@@ -402,24 +526,24 @@ MESSAGES = [
     {"role": "system", "content": "You are a friendly English speaking assistant here to help the user with their health and wellness needs."},
     {"role": "system", "content": "You can answer questions about their medications, schedule, and general health questions."},
     {"role": "system", "content": "You can also add new medications to their list or delete existing ones."},
-    {"role": "system", "content": "You can also schedule appointments for the user."},
-    {"role": "system", "content": "If the user needs to exit, they just need to say 'exit'"},
-    {"role": "system", "content": "Don't make assumptions about what values to plug into functions. Ask for clarification if a user request is ambiguous, do not make a funciton call if the user does not provide required informaiton to do so"},
+    {"role": "system", "content": "Don't make assumptions about what values to plug into functions. Ask for clarification if a user request is ambiguous, make sure the user is specifc about what they want."},
 ]
 
 def generate():
-    while True:
+    end_of_conversation = False
+    while not end_of_conversation:
         global MESSAGES
         prompt = input("Enter a prompt: ")
-        if prompt.lower() == "exit":
-            break
         MESSAGES.append({"role": "user", "content": prompt})
         assistant_message = generate_function_response(MESSAGES)
         
         if hasattr(assistant_message, 'tool_calls') and assistant_message.tool_calls:
+            print(assistant_message)
             for call in assistant_message.tool_calls:
                 results = execute_function_call(call) 
                 MESSAGES.append({"role": "function", "tool_call_id": call.id, "name": call.function.name, "content": str(results)})
+                if "conversation ended" in str(results).lower():
+                    end_of_conversation = True
             reply = generate_chat_response(MESSAGES)
             MESSAGES.append({"role": "assistant", "content": reply})
         else:
@@ -448,6 +572,7 @@ def pretty_print_conversation(messages):
             print(colored(f"function ({message['name']}): {message['content']}\n", role_to_color[message["role"]]))
 
 def conversation():
+    ACTIVATION_KEYWORD="activate"
     model_path = "/Users/annushka/Documents/GitHub/MedMirror-/vosk-model-en-us-0.22"
     output_filename = "output.wav"
 
@@ -461,7 +586,7 @@ def conversation():
 
     try:
         while True:
-            if listen_for_keyword(stream, rec):
+            if listen_for_keyword(stream, rec, ACTIVATION_KEYWORD):
                 record_audio_to_file(output_filename, stream, rec)
                 chat()
     except Exception as e:
@@ -472,6 +597,8 @@ def conversation():
         p.terminate()    
 
 
+
+# This will become the main fucntion that listens for the keyword and then starts the conversation
 def tester_main():
     model_path = "/Users/annushka/Documents/GitHub/MedMirror-/vosk-model-en-us-0.22"
     output_filename = "output.wav"
@@ -558,6 +685,9 @@ def main():
     # add calendar event command
     subparsers.add_parser('add_event', help='add calendar event')
 
+    #get calendar events
+    subparsers.add_parser('get_events', help='Fetch all calendar events')
+
     # Fetch medications command
     subparsers.add_parser('fetch', help='Fetch all medications')
     
@@ -603,6 +733,22 @@ def main():
 
     elif args.command == 'generate':
         generate()
+    
+    elif args.command == "get_events":
+        events = get_calendar_events()
+        print(events)
+
+    elif args.command == 'add_event':
+        subject = input("Enter event subject: ")
+        start = input("Enter start time: ")
+        end = input("Enter end time: ")
+        location = input("Enter location: ")
+        description = input("Enter description: ")
+        if location == "":
+            location = None
+        if description == "":
+            description = None
+        add_calendar_event(subject, start, end, location, description)  
 
     elif args.command == 'transcribe':
         audio_file = open("input.mp3", "rb")
