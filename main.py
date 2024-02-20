@@ -98,10 +98,11 @@ async def send_mail(graph: Graph):
     # Get the user for their email address
     user = await graph.get_user()
     if user:
-        user_email = "aivashkina70@gmail.com"
+        # user_email = "jon.bird@bristol.ac.uk"
+        user_email = "annie43bg@icloud.com"
         # user_email = user.mail or user.user_principal_name
 
-        await graph.send_mail('Testing Microsoft Graph', 'Hey Anna look at this!', user_email or '')
+        await graph.send_mail('Testing Microsoft Graph', 'Hey Jon look at this!', user_email or '')
         print('Mail sent.\n')
 # </SendMailSnippet>
 
@@ -133,9 +134,9 @@ async def make_graph_call(graph: Graph):
             print('Event:', event.subject)
             print('  Start:', event.start.date_time)
             print('  End:', event.end.date_time)
-            print('  Location:', event.location.display_name)
-            print('  Organizer:', event.organizer.email_address.name)
-            print('  Attendees:', len(event.attendees), '\n')   
+            # print('  Location:', event.location.display_name)
+            # print('  Organizer:', event.organizer.email_address.name)
+            # print('  Attendees:', len(event.attendees), '\n')   
 # </MakeGraphCallSnippet>
 
 # Run main

@@ -83,7 +83,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "add_medication",
-            "description": "add a new prescribed medication to the user's list of medications",
+            "description": "add a new prescribed medication to the user's list of medications. Each required parameter must be specified explicitly.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -93,7 +93,7 @@ TOOLS = [
                     },
                     "dosage": {
                         "type": "string",
-                        "description": "The dosage of the medication in mg/g/ml",
+                        "description": "The dosage of the medication in mg/g/ml, must be said explicitly.",
                     },
                     "time": {
                         "type": "string",
@@ -125,7 +125,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "end_conversation",
-            "description": "Ends the current conversation with the user, can be inferred from users input or silence",
+            "description": "Ends the current conversation with the user, can be inferred from users input or silence, e.g. 'goodbye', 'bye', 'stop', 'end conversation', 'that's all thank you' etc.",
         }
     },
     {
@@ -327,7 +327,7 @@ def record_audio_to_file(output_filename, stream, rec, silence_duration=2):
         wf.writeframes(data)  # Write audio data to file
 
         # Check if the current frame is silent
-        is_silent = audioop.rms(data, 2) < 200  # You can adjust the threshold value
+        is_silent = audioop.rms(data, 2) < 1200  # You can adjust the threshold value
 
         if is_silent:
             num_silent_frames += 1
@@ -523,7 +523,8 @@ def delete_calendar_event(event_id):
 # MAIN FUNCTIONS                         #
 ##########################################
 MESSAGES = [
-    {"role": "system", "content": "You are a friendly English speaking assistant here to help the user with their health and wellness needs."},
+    {"role": "system", "content": "You are a friendly assistant here to help the user with their health and wellness needs."},
+    {"role": "system", "content": "Respond in English and do not switch languages."},
     {"role": "system", "content": "You can answer questions about their medications, schedule, and general health questions."},
     {"role": "system", "content": "You can also add new medications to their list or delete existing ones."},
     {"role": "system", "content": "Don't make assumptions about what values to plug into functions. Ask for clarification if a user request is ambiguous, make sure the user is specifc about what they want."},

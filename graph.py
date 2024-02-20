@@ -98,13 +98,15 @@ class Graph:
     # </SendMailSnippet>
 
     # <MakeGraphCallSnippet>
-    async def get_calendar_events(self):
+    async def make_graph_call(self, top: int = 5):
         today = datetime.now().strftime("%Y-%m-%d")
         
         query_params = EventsRequestBuilder.EventsRequestBuilderGetQueryParameters(
             # select=["subject", "body", "bodyPreview", "organizer", "attendees", "start", "end", "location"],
-            select=["subject", "organizer", "attendees", "start", "end", "location"],
-            top=5,
+            # select=["subject", "organizer", "attendees", "start", "end", "location"],
+            select = ["subject", "start", "end"],
+            top=top,
+            orderby=["start/dateTime DESC"],
             filter=f"start/dateTime ge '{today}'"
                 
         )
