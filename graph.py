@@ -15,9 +15,14 @@ from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.models.email_address import EmailAddress
+from msgraph.generated.models.event import Event
+from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
+from msgraph.generated.models.location import Location
+from msgraph.generated.models.attendee import Attendee
 from msgraph import GraphServiceClient
 from msgraph.generated.users.item.events.events_request_builder import EventsRequestBuilder
 from datetime import datetime
+import requests
 
 
 class Graph:
@@ -95,10 +100,14 @@ class Graph:
         request_body.message = message
 
         await self.user_client.me.send_mail.post(body=request_body)
+        
     # </SendMailSnippet>
 
-    # <MakeGraphCallSnippet>
-    async def make_graph_call(self, top: int = 5):
+    async def get_calendars(self):
+        result = await self.user_client.me.calendars.get()
+        return result
+    
+    async def get_calendar_events(self, top: int = 5):
         today = datetime.now().strftime("%Y-%m-%d")
         
         query_params = EventsRequestBuilder.EventsRequestBuilderGetQueryParameters(
@@ -106,14 +115,64 @@ class Graph:
             # select=["subject", "organizer", "attendees", "start", "end", "location"],
             select = ["subject", "start", "end"],
             top=top,
-            orderby=["start/dateTime DESC"],
+            orderby=["start/dateTime ASC"],
             filter=f"start/dateTime ge '{today}'"
                 
         )
         request_configuration = EventsRequestBuilder.EventsRequestBuilderGetRequestConfiguration(
         query_parameters = query_params,
         )
-        request_configuration.headers.add("Prefer", "outlook.timezone=\"Pacific Standard Time\"")
+        request_configuration.headers.add("Prefer", "outlook.timezone=\"Etc/GMT\"")
         result = await self.user_client.me.events.get(request_configuration = request_configuration)
         return result 
-    # </MakeGraphCallSnippet>
+    
+    async def create_event(self, calendar_id: str, subject: str, start: str, end: str, location: str = None, body: str = None, attendees: list = None, is_online : bool = False):
+        request_body = Event(
+            subject = subject,
+
+            start = DateTimeTimeZone(
+                date_time = start,
+                time_zone = "Etc/GMT",
+            ),
+            end = DateTimeTimeZone(
+                date_time = end,
+                time_zone = "Etc/GMT",
+            ),
+            is_online_meeting = is_online
+        )
+        if location:
+            request_body.location = Location(display_name = location)
+        if attendees:
+            #logic for attendees
+            request_body.attendees = []
+        if body:
+            request_body.body = ItemBody(content = body, content_type = BodyType.text)
+
+        result = await self.user_client.me.calendars.by_calendar_id(calendar_id).events.post(request_body)
+        return result
+    
+
+    async def get_ToDo_lists(self):
+        result = await self.user_client.me.todo.lists.get()
+        return result
+    
+    async def get_ToDo_tasks(self, list_id: str):
+        result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.get()
+        return result
+
+
+    async def get_contacts(self):
+        result = await self.user_client.me.contacts.get()
+        return result
+
+
+    async def get_users(self):
+        result = await self.user_client.users.get()
+        users = []
+        for user in result.value:
+            if user.surname is not None:
+                users.append(user.surname)
+        return users
+    
+
+    

@@ -78,6 +78,7 @@ function deleteMedication(id) {
 }
 
 function generateCalendar() {
+
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -146,5 +147,5 @@ function updateDateTime() {
 
 fetchMedicationsAndUpdateView()
 updateDateTime(); // Update time immediately when the page loads
-setInterval(updateTime, 30000);
-setInterval(fetchMedicationsAndUpdateView, 5000); // Then update it every 60 seconds
+setInterval(updateDateTime, 60_000);
+setInterval(fetchMedicationsAndUpdateView, 5_000); // Then update it every 60 seconds
