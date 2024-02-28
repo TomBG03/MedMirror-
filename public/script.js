@@ -122,7 +122,18 @@ function generateCalendar() {
 
 const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-
+// Get the current view state and update view accordingly 
+function checkAndUpdateViewState() {
+    fetch('/api/view')
+        .then(response => response.json())
+        .then(data => {
+            if (data.currentView && data.currentView !== currentView) {
+                switchView(data.currentView);
+                currentView = data.currentView; // Update the currentView variable
+            }
+        })
+        .catch(error => console.error('Error fetching view state:', error));
+}
 
 function updateDateTime() {
     const now = new Date();
@@ -142,10 +153,11 @@ function updateDateTime() {
 }
 
     
-
+let currentView = 'defaultView';
 // Call updateTime() function every minute to keep the time updated
 
 fetchMedicationsAndUpdateView()
 updateDateTime(); // Update time immediately when the page loads
 setInterval(updateDateTime, 60_000);
-setInterval(fetchMedicationsAndUpdateView, 5_000); // Then update it every 60 seconds
+checkAndUpdateViewState();
+setInterval(checkAndUpdateViewState, 5_000);

@@ -63,15 +63,26 @@ class Graph:
     # </GetUserSnippet>
 
     # <GetInboxSnippet>
-    async def get_inbox(self):
+    async def get_inbox(self, filter_by_unread: bool = False, filter_by_sender: str = None, filter_by_subject: str = None, filter_by_received_date: str = None, filter_by_received_time: str = None, top: int = None):
         query_params = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
             # Only request specific properties
             select=['from', 'isRead', 'receivedDateTime', 'subject'],
-            # Get at most 25 results
-            top=5,
             # Sort by received time, newest first
             orderby=['receivedDateTime DESC']
         )
+        if filter_by_unread:
+            query_params.filter = "isRead eq false"
+        if filter_by_sender:
+            query_params.filter = f"from/emailAddress/address eq '{filter_by_sender}'"
+        if filter_by_subject:
+            query_params.filter = f"subject eq '{filter_by_subject}'"
+        if filter_by_received_date:
+            query_params.filter = f"receivedDateTime ge {filter_by_received_date}"
+        if filter_by_received_time:
+            query_params.filter = f"receivedDateTime ge {filter_by_received_time}"
+        if top:
+            query_params.top = top
+            
         request_config = MessagesRequestBuilder.MessagesRequestBuilderGetRequestConfiguration(
             query_parameters= query_params
         )
@@ -157,22 +168,12 @@ class Graph:
         return result
     
     async def get_ToDo_tasks(self, list_id: str):
-        result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.get()
-        return result
+        try:
+            result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.get()
+            return result
+        except Exception as e:
+            return "Unable to get tasks"
 
 
-    async def get_contacts(self):
-        result = await self.user_client.me.contacts.get()
-        return result
-
-
-    async def get_users(self):
-        result = await self.user_client.users.get()
-        users = []
-        for user in result.value:
-            if user.surname is not None:
-                users.append(user.surname)
-        return users
-    
 
     

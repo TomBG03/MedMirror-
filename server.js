@@ -5,7 +5,7 @@ const app = express();
 const port = 3001;
 const mongoose = require('mongoose');
 
-// Replace 'myDatabase' with your database name or use your MongoDB Atlas connection string
+
 mongoose.connect('mongodb://localhost/medMirror', { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.connection.once('open', () => {
     console.log('Connected to MongoDB');
@@ -21,13 +21,13 @@ app.use(express.json());
 // Serve static files from the 'public' directory
 app.use(express.static('public'));
 
-
 app.listen(port, () => {
     console.log(`Smart Mirror app listening at http://localhost:${port}`);
 });
 
-// using mongo database to get medication 
-const Medication = require('./Medication'); // Path to your Medication model
+
+
+const Medication = require('./Medication'); // Path to Medication model
 
 // Endpoint to get all medications
 app.get('/api/medications', async (req, res) => {
@@ -41,6 +41,7 @@ app.get('/api/medications', async (req, res) => {
 
 // Endpoint to add a new medication
 app.post('/api/medications', async (req, res) => {
+    console.log(Medication);
     const newMedication = new Medication(req.body);
 
     try {
@@ -52,7 +53,7 @@ app.post('/api/medications', async (req, res) => {
     }
 });
 
-// DELETE endpoint to remove a medication by its _id
+// Endpoint to remove a medication by its _id
 app.delete('/api/medications/:id', async (req, res) => {
     try {
         const result = await Medication.findByIdAndDelete(req.params.id);
@@ -67,37 +68,21 @@ app.delete('/api/medications/:id', async (req, res) => {
 });
 
 
-const CalendarEvent = require('./calendarEvent'); // Import the model
-app.get('/api/calendar', async (req, res) => {
+
+const ViewState = require('./View'); // Path to View model
+
+// Endpoint to get the current view state
+app.get('/api/view', async (req, res) => {
     try {
-        const events = await CalendarEvent.find();
-        res.json(events);
+        const viewState = await ViewState.findOne();
+        res.json(viewState);
     } catch (error) {
         res.status(500).send(error);
     }
 });
 
-app.post('/api/calendar', async (req, res) => {
-    const event = new CalendarEvent(req.body);
-    try {
-        const savedEvent = await event.save();
-        res.status(201).json(savedEvent);
-        console.log('Event added')
-    } catch (error) {
-        res.status(400).send(error);
-    }
+app.post('/api/view', async (req, res) => {
+  const { viewName } = req.body;
+  await ViewState.updateOne({}, { currentView: viewName }, { upsert: true });
+  res.send({ status: 'View updated successfully', currentView: viewName });
 });
-
-app.delete('/api/calendar/:id', async (req, res) => {
-    try {
-        const result = await CalendarEvent.findByIdAndDelete(req.params.id);
-        if (result) {
-            res.send({ message: "Calendar event deleted successfully" });
-        } else {
-            res.status(404).send({ message: "Calendar event not found" });
-        }
-    } catch (error) {
-        res.status(500).send(error);
-    }
-});
-

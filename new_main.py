@@ -53,17 +53,16 @@ async def main():
     # stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=4096)
     # stream.start_stream()
 
-    calendars, to_do_lists = await get_user_info(graph)
-    myAI.add_message("user", "my calendars are " + str(calendars))
-    myAI.add_message("user", "my to do lists are " + str(to_do_lists))
+    # calendars, to_do_lists = await get_user_info(graph)
+    # myAI.add_message("user", "my default calendars is " + str(calendars))
+    # myAI.add_message("user", "my default To-Do list is " + str(to_do_lists))
     end_of_conversation = False
     while not end_of_conversation:
         timeStamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         prompt = input("Enter a prompt: ")
-        myAI.add_message("user", prompt + " current date and time: " + timeStamp)
+        myAI.add_message("user", prompt + "{ Message Date and Timestamp: " + timeStamp + " }")
         assistant_message = await myAI.generate_function_response()
         if hasattr(assistant_message, 'tool_calls') and assistant_message.tool_calls:
-            print(assistant_message.tool_calls)
             for call in assistant_message.tool_calls:
                 results = await execute_function_call(graph, call) 
                 myAI.add_func_message("function", call.id, call.function.name, str(results))
@@ -238,11 +237,19 @@ async def get_ToDo_tasks(graph: Graph, list_id: str):
     return result
 
 
-async def get_user_info(graph: Graph):
-    calendars = await graph.get_calendars()
-    to_do_lists = await graph.get_ToDo_lists()
+# async def get_user_info(graph: Graph):
+#     calendars = await graph.get_calendars()
+#     # only return calendars which calendar.isDefaultCalendar is True
+#     calendars = [calendar for calendar in calendars if calendar.is_default_calendar == True]
+#     to_do_lists = await graph.get_ToDo_lists()
+#     to_do_lists = [to_do_list for to_do_list in to_do_lists if to_do_list.is_owner == True]
 
-    return calendars, to_do_lists  
+#     return calendars, to_do_lists  
+
+async def get_contacts(graph: Graph, seacrh_args: str = None):
+    result = await graph.get_contacts(search_args=seacrh_args)
+    return result
+
 
 async def execute_function_call(graph, tool_call):
     func_name = tool_call.function.name 
@@ -252,6 +259,10 @@ async def execute_function_call(graph, tool_call):
     elif func_name == "get_users":
         results = await graph.get_users()
         # print(results)
+    elif func_name == "get_contacts":
+        args = json.loads(tool_call.function.arguments)
+        seacrh_args = args.get("search_args", None)
+        results = await get_contacts(graph)
     elif func_name == "get_current_datetime":
         results = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     elif func_name == "get_outlook_caledar_events":
@@ -502,6 +513,22 @@ TOOLS = [
         "function": {
             "name": "get_calendars",
             "description": "gets the users calendars and their information including the calendar_id and name",
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_contacts",
+            "description": "gets the users contacts and their information including the contact_id, name and email address",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "search_args": {
+                        "type": "string",
+                        "description": "What to search for in the contacts, e.g. name, email address, etc.",
+                    },
+                },
+            }
         }
     },
     {

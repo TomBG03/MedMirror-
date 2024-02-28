@@ -22,28 +22,28 @@ class MyAI():
         self.client = OpenAI(api_key=self.key)
     
     
-    # async def speech_to_text(self, audio_file):
-    #     transcript = self.client.audio.transcriptions.create(
-    #         model="whisper-1", 
-    #         file=audio_file
-    #     )
-    #     return transcript.text
-
-
     async def speech_to_text(self, audio_file):
-        # load audio and pad/trim it to fit 30 seconds
-        audio = whisper.load_audio(audio_file)
-        audio = whisper.pad_or_trim(audio)
-        # make log-Mel spectrogram and move to the same device as the model
-        mel = whisper.log_mel_spectrogram(audio).to(self.whisper_model.device)
-        # detect the spoken language
-        _, probs = self.whisper_model.detect_language(mel)
-        print(f"Detected language: {max(probs, key=probs.get)}")
-        # decode the audio
-        options = whisper.DecodingOptions()
-        result = whisper.decode(self.whisper_model, mel, options)
-        # print the recognized text
-        return result.text
+        transcript = self.client.audio.transcriptions.create(
+            model="whisper-1", 
+            file=audio_file
+        )
+        return transcript.text
+
+
+    # async def speech_to_text(self, audio_file):
+    #     # load audio and pad/trim it to fit 30 seconds
+    #     audio = whisper.load_audio(audio_file)
+    #     audio = whisper.pad_or_trim(audio)
+    #     # make log-Mel spectrogram and move to the same device as the model
+    #     mel = whisper.log_mel_spectrogram(audio).to(self.whisper_model.device)
+    #     # detect the spoken language
+    #     _, probs = self.whisper_model.detect_language(mel)
+    #     print(f"Detected language: {max(probs, key=probs.get)}")
+    #     # decode the audio
+    #     options = whisper.DecodingOptions()
+    #     result = whisper.decode(self.whisper_model, mel, options)
+    #     # print the recognized text
+    #     return result.text
     
     async def generate_function_response(self):
         response = self.client.chat.completions.create(
@@ -74,8 +74,21 @@ class MyAI():
             return speech_file_path
         except Exception as e:
             return None
-
-    
+        
+    def create_mp3(self, reminder_message, filename):
+        speech_file_path = Path(__file__).parent / filename
+        response = self.client.audio.speech.create(
+            model="tts-1",
+            voice="alloy",
+            speed=1.0,
+            input=reminder_message
+        )
+        try:
+            response.write_to_file(speech_file_path)
+            return speech_file_path
+        except Exception as e:
+            return None
+        
     def add_message(self, role, content):
         new_msg = {"role": role, "content": content}
         self.messages.append(new_msg)
