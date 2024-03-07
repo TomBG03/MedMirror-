@@ -21,6 +21,7 @@ from msgraph.generated.models.location import Location
 from msgraph.generated.models.attendee import Attendee
 from msgraph import GraphServiceClient
 from msgraph.generated.users.item.events.events_request_builder import EventsRequestBuilder
+from msgraph.generated.models.subscription import Subscription
 from datetime import datetime
 import requests
 
@@ -38,16 +39,16 @@ class Graph:
 
         self.device_code_credential = DeviceCodeCredential(client_id, tenant_id = tenant_id)
         self.user_client = GraphServiceClient(self.device_code_credential, graph_scopes)
-# </UserAuthConfigSnippet>
 
-    # <GetUserTokenSnippet>
+    #############################################################
+    # User functions                                            #
+    #############################################################
+   
     async def get_user_token(self):
         graph_scopes = self.settings['graphUserScopes']
         access_token = self.device_code_credential.get_token(graph_scopes)
         return access_token.token
-    # </GetUserTokenSnippet>
-
-    # <GetUserSnippet>
+  
     async def get_user(self):
         # Only request specific properties using $select
         query_params = UserItemRequestBuilder.UserItemRequestBuilderGetQueryParameters(
@@ -60,27 +61,28 @@ class Graph:
 
         user = await self.user_client.me.get(request_configuration=request_config)
         return user
-    # </GetUserSnippet>
 
-    # <GetInboxSnippet>
+    #############################################################
+    # Email functions                                           #
+    #############################################################
     async def get_inbox(self, filter_by_unread: bool = False, filter_by_sender: str = None, filter_by_subject: str = None, filter_by_received_date: str = None, filter_by_received_time: str = None, top: int = None):
         query_params = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
             # Only request specific properties
-            select=['from', 'isRead', 'receivedDateTime', 'subject'],
+            select=['id','from','isRead','receivedDateTime','subject','body'],
             # Sort by received time, newest first
             orderby=['receivedDateTime DESC']
         )
         if filter_by_unread:
             query_params.filter = "isRead eq false"
-        if filter_by_sender:
+        if filter_by_sender is not None:
             query_params.filter = f"from/emailAddress/address eq '{filter_by_sender}'"
-        if filter_by_subject:
+        if filter_by_subject is not None:
             query_params.filter = f"subject eq '{filter_by_subject}'"
-        if filter_by_received_date:
-            query_params.filter = f"receivedDateTime ge {filter_by_received_date}"
-        if filter_by_received_time:
+        if filter_by_received_date is not None:
+            query_params.filter = f" and receivedDateTime ge {filter_by_received_date}"
+        if filter_by_received_time is not None:
             query_params.filter = f"receivedDateTime ge {filter_by_received_time}"
-        if top:
+        if top is not None:
             query_params.top = top
             
         request_config = MessagesRequestBuilder.MessagesRequestBuilderGetRequestConfiguration(
@@ -89,10 +91,23 @@ class Graph:
 
         messages = await self.user_client.me.mail_folders.by_mail_folder_id('inbox').messages.get(
                 request_configuration=request_config)
-        return messages
-    # </GetInboxSnippet>
-
-    # <SendMailSnippet>
+    
+        message_data = []
+        for message in messages.value:
+            message_data.append({
+                'id': message.id,
+                'subject': message.subject,
+                'received_date': message.received_date_time,
+                'from': message.from_.email_address.address
+            })
+       
+        return message_data
+    
+    async def read_email(self, message_id: str):
+        message = await self.user_client.me.messages.by_message_id(message_id).get()
+        message_data = message.body_preview
+        return message_data
+    
     async def send_mail(self, subject: str, body: str, recipient: str):
         message = Message()
         message.subject = subject
@@ -110,32 +125,42 @@ class Graph:
         request_body = SendMailPostRequestBody()
         request_body.message = message
 
-        await self.user_client.me.send_mail.post(body=request_body)
-        
+        result = await self.user_client.me.send_mail.post(body=request_body)
+        return result 
     # </SendMailSnippet>
 
+
+    #############################################################
+    # Calendar functions                                        #
+    #############################################################
     async def get_calendars(self):
         result = await self.user_client.me.calendars.get()
         return result
     
-    async def get_calendar_events(self, top: int = 5):
-        today = datetime.now().strftime("%Y-%m-%d")
+    async def get_calendar_events(self, top: int = None, start_date: datetime = None, end_date: datetime = None):
         
         query_params = EventsRequestBuilder.EventsRequestBuilderGetQueryParameters(
-            # select=["subject", "body", "bodyPreview", "organizer", "attendees", "start", "end", "location"],
-            # select=["subject", "organizer", "attendees", "start", "end", "location"],
             select = ["subject", "start", "end"],
-            top=top,
-            orderby=["start/dateTime ASC"],
-            filter=f"start/dateTime ge '{today}'"
-                
+            orderby=["start/dateTime ASC"],   
         )
+        if top is not None:
+            query_params.top = top
+        if start_date is not None and end_date is not None:
+            query_params.filter = f"start/dateTime ge '{start_date}' and end/dateTime le '{end_date}'"
         request_configuration = EventsRequestBuilder.EventsRequestBuilderGetRequestConfiguration(
         query_parameters = query_params,
         )
         request_configuration.headers.add("Prefer", "outlook.timezone=\"Etc/GMT\"")
-        result = await self.user_client.me.events.get(request_configuration = request_configuration)
-        return result 
+        events = await self.user_client.me.events.get(request_configuration = request_configuration)
+        event_data = []
+        for event in events.value:
+            event_data.append({
+                "event_id": event.id,
+                "subject": event.subject,
+                "start": event.start.date_time,
+                "end": event.end.date_time
+            })
+        return event_data
     
     async def create_event(self, calendar_id: str, subject: str, start: str, end: str, location: str = None, body: str = None, attendees: list = None, is_online : bool = False):
         request_body = Event(
@@ -157,23 +182,98 @@ class Graph:
             #logic for attendees
             request_body.attendees = []
         if body:
-            request_body.body = ItemBody(content = body, content_type = BodyType.text)
+            request_body.body = ItemBody(content = body, content_type = BodyType.Text)
 
         result = await self.user_client.me.calendars.by_calendar_id(calendar_id).events.post(request_body)
         return result
     
+    async def edit_event(self, event_id: str, subject: str = None, start: str = None, end: str = None, location: str = None, body: str = None, attendees: list = None, is_online : bool = False):
+        request_body = Event(
+            subject = subject,
+            start = DateTimeTimeZone(
+                date_time = start,
+                time_zone = "Etc/GMT",
+            ),
+            end = DateTimeTimeZone(
+                date_time = end,
+                time_zone = "Etc/GMT",
+            ),
+            is_online_meeting = is_online
+        )
+        if location:
+            request_body.location = Location(display_name = location)
+        if attendees:
+            #logic for attendees
+            request_body.attendees = []
+        if body:
+            request_body.body = ItemBody(content = body, content_type = BodyType.Text)
 
+        result = await self.user_client.me.events.by_event_id(event_id).patch(request_body)
+        return result
+
+    async def delete_event(self, event_id: str):
+        result = await self.user_client.me.events.by_event_id(event_id).delete()
+        return result
+    
+    #############################################################
+    # ToDo List functions                                       #
+    #############################################################
     async def get_ToDo_lists(self):
         result = await self.user_client.me.todo.lists.get()
         return result
     
     async def get_ToDo_tasks(self, list_id: str):
+        tasks = []
         try:
-            result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.get()
-            return result
+            task_data = []
+            tasks = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.get()
+            for task in tasks.value:
+                task_data.append({
+                    "task_id": task.id,
+                    "title": task.title,
+                    "status": task.status,
+                    "created_date": task.created_date_time,
+                    "due_date": task.due_date_time
+                })
+            print(task_data)
+            return task_data
         except Exception as e:
             return "Unable to get tasks"
 
-
-
+    async def create_task(self, list_id: str, title: str, due_date: str, body: str = None, reminder_date: datetime = None):
+        request_body = {
+            "title": title,
+            "dueDateTime": due_date,
+            "reminderDateTime": reminder_date
+        }
+        if body:
+            request_body["body"] = {"content": body, "contentType": "text"}
+        result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.post(request_body)
+        return result
+    
+    async def edit_task(self, list_id: str, task_id: str, title: str = None, due_date: str = None, body: str = None):
+        request_body = {
+            "title": title,
+            "dueDateTime": due_date
+        }
+        if body:
+            request_body["body"] = {"content": body, "contentType": "text"}
+        result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.by_todo_task_id(task_id).patch(request_body)
+        return result
+    
+    async def delete_task(self, list_id: str, task_id: str):
+        result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.by_todo_task_id(task_id).delete()
+        return result
+    #############################################################
+    # Subscription functions                                    #
+    #############################################################
+    async def create_subscription(self, change_type: str, notification_url: str, resource: str, expiration_date_time: str):
+        subscription = Subscription(
+            change_type = change_type,
+            notification_url = notification_url,
+            resource = resource,
+            expiration_date_time = expiration_date_time
+        )
+        result = await self.user_client.subscriptions.post(subscription)
+        return result
     

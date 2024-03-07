@@ -14,6 +14,7 @@ import whisper
 
 class MyAI():
     def __init__(self, TOOLS, MESSAGES):
+        self.init_messages = MESSAGES
         self.messages = MESSAGES
         self.TOOLS = TOOLS
         self.model = "gpt-3.5-turbo-1106"
@@ -75,7 +76,7 @@ class MyAI():
         except Exception as e:
             return None
         
-    def create_mp3(self, reminder_message, filename):
+    async def create_mp3(self, reminder_message, filename):
         speech_file_path = Path(__file__).parent / filename
         response = self.client.audio.speech.create(
             model="tts-1",
@@ -115,3 +116,6 @@ class MyAI():
                 print(colored(f"assistant: {message['content']}\n", role_to_color[message["role"]]))
             elif message["role"] == "function":
                 print(colored(f"function ({message['name']}): {message['content']}\n", role_to_color[message["role"]]))
+
+    def reset_messages(self):
+        self.messages = self.init_messages

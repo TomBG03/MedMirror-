@@ -69,22 +69,33 @@ TOOLS = [
                         "type": "string",
                         "description": "Filter by email subject",
                     },
-                    "filter_by_received_date": {
-                        "type": "string",
-                        "description": "Filter by received date, e.g. 2024-01-01",
-                    },
-                    "filter_by_received_time": {
-                        "type": "string",
-                        "description": "Filter by received time, e.g. 12:00:00",
-                    },
                     "top": {
                         "type": "integer",
                         "description": "Number of emails to return",
+                    },
+                    "year": {
+                        "type": "integer",
+                        "description": "The year of the email, if the user wants to filter by received date",
+                    },
+                    "month": {
+                        "type": "integer",
+                        "description": "The month of the email, if the user wants to filter by received date",
+                    },
+                    "day": {
+                        "type": "integer",
+                        "description": "The day of the email, if the user wants to filter by received date",
+                    },
+                    "hour": {
+                        "type": "integer",
+                        "description": "The hour of the email, if the user wants to filter by received time",
+                    },
+                    "minute": {
+                        "type": "integer",
+                        "description": "The minute of the email, if the user wants to filter by received time",
                     }
                 }
             }
         }
-
     },
     {
         "type": "function",
@@ -143,6 +154,10 @@ TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "reminder_name":{
+                        "type": "string",
+                        "description": "A single word to describe the reminder can be inferred from user, e.g. 'medication', 'appointment1', 'appointment2', etc.",
+                    },
                     "reminder_message": {
                         "type": "string",
                         "description": "The message to remind the user about",
@@ -172,7 +187,7 @@ TOOLS = [
                         "description": "The second the reminder should occur, e.g. 0 for the start of the minute, 30 for half past, etc.",
                     }
                 },
-                "required": ["reminder_message", "year", "month", "day", "hour", "minute", "second"]
+                "required": ["reminder_name","reminder_message", "year", "month", "day", "hour", "minute", "second"]
             }
         }
     },
@@ -243,12 +258,16 @@ class myScheduler:
         self.scheduler = AsyncIOScheduler(job_defaults={"coalesce": True, "max_instances": 2, "misfire_grace_time": 60*60})
         self.scheduler.start()
         self.ai = ai
-        
+
+        self.have_jobs_to_execute = False
+        self.jobs_to_execute = []
+         
     def add_reminder(self, seconds, reminder_message='Time to take a break!'):
         self.scheduler.add_job(self._play_sound, 'interval', seconds=seconds, args=[reminder_message])
-    def add_single_reminder(self, date, reminder_message='Time to take a break!'):
+    
+    def add_single_reminder(self, date, path_to_mp3, reminder_message='Time to take a break!'):
         try:
-            self.scheduler.add_job(self._play_sound, 'date', run_date=date, args=[reminder_message])
+            self.scheduler.add_job(self._play_sound, 'date', run_date=date, args=[reminder_message, path_to_mp3])
             return "Reminder added"
         except Exception as e:
             return(f"Error: {e}")
@@ -263,9 +282,22 @@ class myScheduler:
         self.scheduler.remove_all_jobs()
     def stop(self):
         self.scheduler.shutdown()
-    def _play_sound(self, reminder_message):
+    
+    def remind_me(self, reminder_message, path_to_mp3):
+        reminder = self.ai.create_mp3(reminder_message, path_to_mp3)
+        self.have_jobs_to_execute = True
+        self.jobs_to_execute.append(reminder)
+    
+    def execute_reminders(self):
         playsound('ding.mp3')
-        reminder = self.ai.create_mp3(reminder_message, "reminder.mp3")
+        for reminder in self.jobs_to_execute:
+            playsound(reminder)
+        self.have_jobs_to_execute = False
+        self.jobs_to_execute = []
+
+    def _play_sound(self, reminder_message, path_to_mp3):
+        playsound('ding.mp3')
+        reminder = self.ai.create_mp3(reminder_message, path_to_mp3)
         playsound(reminder)
     def get_reminders(self):
         return self.scheduler.get_jobs()
@@ -286,7 +318,7 @@ async def record_audio_to_file(output_filename, stream, rec, silence_duration=2)
     while True:
         data = stream.read(4096, exception_on_overflow=False)
         wf.writeframes(data)  
-        is_silent = audioop.rms(data, 2) < 500 
+        is_silent = audioop.rms(data, 2) < 300 
         if is_silent:
             num_silent_frames += 1
         else:
@@ -357,7 +389,7 @@ async def get_user(graph: Graph):
     else:
         return "Unable to get user info"
     
-async def get_emails(graph: Graph, filter_by_unread: bool = False, filter_by_sender: str = None, filter_by_subject: str = None, filter_by_received_date: str = None, filter_by_received_time: str = None, top: int = 5):
+async def get_emails(graph: Graph, filter_by_unread: bool = False, filter_by_sender: str = None, filter_by_subject: str = None, filter_by_received_date: str = None, filter_by_received_time: str = None, top: int = 3):
     result = await graph.get_inbox(filter_by_unread, filter_by_sender, filter_by_subject, filter_by_received_date, filter_by_received_time, top)
     return result
 
@@ -389,11 +421,20 @@ async def execute_function_call(graph, schedular, tool_call):
     # Outlook API calls
     elif func_name == "get_emails":
         filter_by_unread = args.get("filter_by_unread", False)
-        filter_by_sender = args.get("filter_by_sender")
-        filter_by_subject = args.get("filter_by_subject")
-        filter_by_received_date = args.get("filter_by_received_date")
-        filter_by_received_time = args.get("filter_by_received_time")
-        top = args.get("top", 5)
+        filter_by_sender = args.get("filter_by_sender", None)
+        filter_by_subject = args.get("filter_by_subject", None)
+        filter_by_received_date = args.get("filter_by_received_date", None)
+        filter_by_received_time = args.get("filter_by_received_time", None)
+        year = args.get("year", None)
+        month = args.get("month", None)
+        day = args.get("day", None)
+        hour = args.get("hour", None)
+        minute = args.get("minute", None)
+        top = args.get("top", 3)
+        if year and month and day:
+            filter_by_received_date = datetime(year, month, day)
+        if hour and minute:
+            filter_by_received_time = datetime(year, month, day, hour, minute)
         results = await get_emails(graph, filter_by_unread, filter_by_sender, filter_by_subject, filter_by_received_date, filter_by_received_time, top)
     elif func_name == "get_todo_lists":
         results = await get_ToDo_lists(graph)
@@ -431,14 +472,16 @@ async def execute_function_call(graph, schedular, tool_call):
 
     elif func_name == "add_one_time_reminder":
         reminder_message = args.get("reminder_message", "No message")
+        name = args.get("reminder_name")
         year = args.get("Year")
         month = args.get("Month")
         day = args.get("Day")
         hour = args.get("Hour")
         minute = args.get("Minute")
         second = args.get("Second")
-        date = datetime(year, month, day, hour, minute, second)        
-        results = schedular.add_single_reminder(date, reminder_message)
+        date = datetime(year, month, day, hour, minute, second)
+        path_to_mp3 = f"{name}.mp3"        
+        results = schedular.add_single_reminder(date, path_to_mp3, reminder_message)
     
     # ================================================
     else:
@@ -526,6 +569,7 @@ async def main():
                     user_prompt = await myAI.speech_to_text(audio_file)
                     if "end conversation" in user_prompt.lower():
                         end_of_conversation = True
+                        myAI.reset_messages()
                         continue
                     day_of_week = datetime.now().strftime("%c")
                     myAI.add_message("user", user_prompt + " {Message Locale's Date and Timestamp: " + day_of_week + "}")
