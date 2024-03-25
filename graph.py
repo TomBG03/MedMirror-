@@ -13,6 +13,7 @@ from msgraph.generated.users.item.send_mail.send_mail_post_request_body import (
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.body_type import BodyType
+from msgraph.generated.models.todo_task import TodoTask
 from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.event import Event
@@ -124,9 +125,11 @@ class Graph:
 
         request_body = SendMailPostRequestBody()
         request_body.message = message
-
-        result = await self.user_client.me.send_mail.post(body=request_body)
-        return result 
+        try:
+            result = await self.user_client.me.send_mail.post(body=request_body)
+            return "Email sent successfully"
+        except Exception as e:
+            return "Unable to send email"
     # </SendMailSnippet>
 
 
@@ -137,7 +140,7 @@ class Graph:
         result = await self.user_client.me.calendars.get()
         return result
     
-    async def get_calendar_events(self, top: int = None, start_date: datetime = None, end_date: datetime = None):
+    async def get_calendar_events(self, top: int = None, start_date: str = None, end_date: str = None):
         
         query_params = EventsRequestBuilder.EventsRequestBuilderGetQueryParameters(
             select = ["subject", "start", "end"],
@@ -146,7 +149,8 @@ class Graph:
         if top is not None:
             query_params.top = top
         if start_date is not None and end_date is not None:
-            query_params.filter = f"start/dateTime ge '{start_date}' and end/dateTime le '{end_date}'"
+            if start_date is not None and end_date is not None:
+                query_params.filter = f"start/dateTime ge '{start_date}' and end/dateTime le '{end_date}'"
         request_configuration = EventsRequestBuilder.EventsRequestBuilderGetRequestConfiguration(
         query_parameters = query_params,
         )
@@ -185,7 +189,7 @@ class Graph:
             request_body.body = ItemBody(content = body, content_type = BodyType.Text)
 
         result = await self.user_client.me.calendars.by_calendar_id(calendar_id).events.post(request_body)
-        return result
+        return "Event created successfully"
     
     async def edit_event(self, event_id: str, subject: str = None, start: str = None, end: str = None, location: str = None, body: str = None, attendees: list = None, is_online : bool = False):
         request_body = Event(
@@ -209,11 +213,12 @@ class Graph:
             request_body.body = ItemBody(content = body, content_type = BodyType.Text)
 
         result = await self.user_client.me.events.by_event_id(event_id).patch(request_body)
-        return result
+
+        return "Event updated successfully"
 
     async def delete_event(self, event_id: str):
         result = await self.user_client.me.events.by_event_id(event_id).delete()
-        return result
+        return f"Event deleted successfully"
     
     #############################################################
     # ToDo List functions                                       #
@@ -240,25 +245,28 @@ class Graph:
         except Exception as e:
             return "Unable to get tasks"
 
-    async def create_task(self, list_id: str, title: str, due_date: str, body: str = None, reminder_date: datetime = None):
-        request_body = {
-            "title": title,
-            "dueDateTime": due_date,
-            "reminderDateTime": reminder_date
-        }
-        if body:
-            request_body["body"] = {"content": body, "contentType": "text"}
-        result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.post(request_body)
+    async def create_task(self, list_id: str, title: str, due_date: str, body: str = None, reminder_date: str = None):
+        task = TodoTask(
+        title=title,
+        dueDateTime=DateTimeTimeZone(date_time=due_date, time_zone="Etc/GMT"),
+        # Construct the body using the appropriate class, if necessary
+        body=ItemBody(content = body, content_type = BodyType.Text) if body else None,
+        )
+        if reminder_date is not None:
+            task.reminderDateTime=reminder_date
+            task.isReminderOn=True
+        
+        result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.post(task)
         return result
     
     async def edit_task(self, list_id: str, task_id: str, title: str = None, due_date: str = None, body: str = None):
-        request_body = {
-            "title": title,
-            "dueDateTime": due_date
-        }
-        if body:
-            request_body["body"] = {"content": body, "contentType": "text"}
-        result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.by_todo_task_id(task_id).patch(request_body)
+        task = TodoTask(
+        title=title,
+        dueDateTime=DateTimeTimeZone(date_time=due_date, time_zone="Etc/GMT"),
+        # Construct the body using the appropriate class, if necessary
+        body=ItemBody(content = body, content_type = BodyType.Text) if body else None,
+        )
+        result = await self.user_client.me.todo.lists.by_todo_task_list_id(list_id).tasks.by_todo_task_id(task_id).patch(task)
         return result
     
     async def delete_task(self, list_id: str, task_id: str):

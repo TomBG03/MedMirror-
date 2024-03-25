@@ -7,6 +7,8 @@ import numpy as np
 from datetime import datetime
 from termcolor import colored
 import whisper
+from dotenv import load_dotenv
+load_dotenv()
 
 
 
@@ -17,7 +19,7 @@ class MyAI():
         self.init_messages = MESSAGES
         self.messages = MESSAGES
         self.TOOLS = TOOLS
-        self.model = "gpt-3.5-turbo-1106"
+        self.model = "gpt-4-0125-preview"
         self.whisper_model = whisper.load_model("base")
         self.key = os.getenv('OPENAI_API_KEY')
         self.client = OpenAI(api_key=self.key)
@@ -76,7 +78,7 @@ class MyAI():
         except Exception as e:
             return None
         
-    async def create_mp3(self, reminder_message, filename):
+    def create_mp3(self, reminder_message, filename):
         speech_file_path = Path(__file__).parent / filename
         response = self.client.audio.speech.create(
             model="tts-1",

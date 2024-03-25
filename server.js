@@ -67,6 +67,23 @@ app.delete('/api/medications/:id', async (req, res) => {
     }
 });
 
+// Endpoint to update a medication by its _id
+app.put('/api/medications/:id', async (req, res) => {
+    try {
+        const result = await Medication.findByIdAndUpdate
+            (req.params.id, req.body, { new: true });
+        if (result) {
+            res.json(result);
+        }
+        else {
+            res.status(404).send({ message: "Medication not found" });
+        }
+    } catch (error) {
+        res.status(500)
+            .send(error);
+    }
+});
+
 
 
 const ViewState = require('./View'); // Path to View model

@@ -52,6 +52,43 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "get_calendar_events",
+            "description": "get list of calendar events for the user, can be filtered by start date and end date",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "start_year": {
+                        "type": "integer",
+                        "description": "The year of the start date",
+                    },
+                    "start_month": {
+                        "type": "integer",
+                        "description": "The month of the start date",
+                    },
+                    "start_day": {
+                        "type": "integer",
+                        "description": "The day of the start date",
+                    },
+                    "end_year": {
+                        "type": "integer",
+                        "description": "The year of the end date",
+                    },
+                    "end_month": {
+                        "type": "integer",
+                        "description": "The month of the end date",
+                    },
+                    "end_day": {
+                        "type": "integer",
+                        "description": "The day of the end date",
+                    }
+                },
+                "required": ["start_date", "end_date"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_emails",
             "description": "get list of emails from the user's inbox, can be filtered by unread, sender, subject, received date, received time, and number of emails to return",
             "parameters": {
@@ -262,8 +299,8 @@ class myScheduler:
         self.have_jobs_to_execute = False
         self.jobs_to_execute = []
          
-    def add_reminder(self, seconds, reminder_message='Time to take a break!'):
-        self.scheduler.add_job(self._play_sound, 'interval', seconds=seconds, args=[reminder_message])
+    def add_reminder(self, seconds, path_to_mp3, reminder_message='Time to take a break!'):
+        self.scheduler.add_job(self._play_sound, 'interval', seconds=seconds, args=[reminder_message, path_to_mp3])
     
     def add_single_reminder(self, date, path_to_mp3, reminder_message='Time to take a break!'):
         try:
@@ -388,19 +425,48 @@ async def get_user(graph: Graph):
         return user
     else:
         return "Unable to get user info"
-    
+
+
+
 async def get_emails(graph: Graph, filter_by_unread: bool = False, filter_by_sender: str = None, filter_by_subject: str = None, filter_by_received_date: str = None, filter_by_received_time: str = None, top: int = 3):
     result = await graph.get_inbox(filter_by_unread, filter_by_sender, filter_by_subject, filter_by_received_date, filter_by_received_time, top)
     return result
+async def read_email(graph: Graph, email_id: str):
+    result = await graph.read_email(email_id)
+    return result
+async def send_email(graph: Graph, recipient: str, subject: str, body: str):
+    result = await graph.send_email(recipient, subject, body)
+    return result
+
 
 async def get_ToDo_lists(graph: Graph):
     result = await graph.get_ToDo_lists()
     return result
-
 async def get_ToDo_tasks(graph: Graph, list_id: str):
     result = await graph.get_ToDo_tasks(list_id)
     return result
+async def add_ToDo_task(graph: Graph, list_id: str, title: str, due_date: datetime, body: str, reminder_date: datetime):
+    result = await graph.create_task(list_id, title, due_date, body, reminder_date)
+    return result
+async def edit_ToDo_task(graph: Graph, task_id: str, title: str, due_date: datetime, reminder_date: datetime):
+    result = await graph.edit_task(task_id, title, due_date, reminder_date)
+    return result
+async def delete_ToDo_task(graph: Graph, task_id: str):
+    result = await graph.delete_task(task_id)
+    return result
 
+async def get_calendar_events(graph: Graph, start_date: datetime, end_date: datetime):
+    result = await graph.get_calendar_events(start_date, end_date)
+    return result
+async def add_calendar_event(graph: Graph, calendar_id: str, subject: str, start_date: datetime, end_date: datetime, location: str, body: str, isOnline: bool):
+    result = await graph.create_event(calendar_id, subject, start_date, end_date, location, body, is_online=isOnline)
+    return result
+async def edit_calendar_event(graph: Graph, event_id: str, subject: str, start_date: datetime, end_date: datetime, location: str, body: str, isOnline: bool):
+    result = await graph.edit_event(event_id, subject, start_date, end_date, location, body, is_online=isOnline)
+    return result
+async def delete_calendar_event(graph: Graph, event_id: str):
+    result = await graph.delete_event(event_id)
+    return result
 # ============================================================================= #
 # Execution of fuction calls                                                    #           
 # ============================================================================= #
@@ -419,6 +485,16 @@ async def execute_function_call(graph, schedular, tool_call):
     
     # ================================================
     # Outlook API calls
+    elif func_name == "get_calendar_events":
+        start_year = args.get("start_year")
+        start_month = args.get("start_month")
+        start_day = args.get("start_day")
+        end_year = args.get("end_year")
+        end_month = args.get("end_month")
+        end_day = args.get("end_day")
+        start_date = datetime(start_year, start_month, start_day)
+        end_date = datetime(end_year, end_month, end_day)
+        results = await get_calendar_events(graph, start_date, end_date)
     elif func_name == "get_emails":
         filter_by_unread = args.get("filter_by_unread", False)
         filter_by_sender = args.get("filter_by_sender", None)
@@ -436,6 +512,9 @@ async def execute_function_call(graph, schedular, tool_call):
         if hour and minute:
             filter_by_received_time = datetime(year, month, day, hour, minute)
         results = await get_emails(graph, filter_by_unread, filter_by_sender, filter_by_subject, filter_by_received_date, filter_by_received_time, top)
+    
+    
+    
     elif func_name == "get_todo_lists":
         results = await get_ToDo_lists(graph)
     elif func_name == "get_todo_tasks":
