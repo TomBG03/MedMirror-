@@ -7,6 +7,6 @@ const EventsSchema = new mongoose.Schema({
     location: String,
 });
 
-const Events = mongoose.model('Medication', EventsSchema);
+const Event = mongoose.model('Event', EventsSchema);
 
-module.exports = Events; 
+module.exports = Event; 
