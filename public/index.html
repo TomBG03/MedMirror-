@@ -11,37 +11,38 @@
         <div id="date-display">DAY MONTH YEAR</div>
     </div>
 
-    <div id="navigation">
+    <!-- <div id="navigation">
+    <button id="show-welcome">Welcome Screen</button>
+     <button id="show-mirror">Mirror</button>
     <button id="show-medications">Medications</button>
     <button id="show-calendar">Calendar</button>
     <button id="show-todos">To-Do List</button>
-</div>
+    
+</div> -->
 
 <div id="views">
+    <section id="dayOfEvents-view" class="view">
+        <li id="day-container"></li>
+    </section>
+    <section id="mirror-view" class="view">
+        <p></p>
+    </section>
+    <section id="welcome-view" class="view">
+        <h2>Welcome to the Smart Mirror</h2>
+        <p>This is a smart mirror interface that displays the time, date, and other useful information.</p>
+        <p>To interact with the mirror just say the keyword "activate"</p>
+    </section>
     <section id="medications-view" class="view">
-        <h2>Medications</h2>
-        <h3>Your medications: </h3>
-        <p style="text-indent: 40px;"> 
-            Name - Dose - Time
-        </p>
         <ul></ul>
     </section>
-    <section id="calendar-view" class="view" style="display: none;">
-        <p>Month</p>
+    <section id="calendar-view" class="view">
         <div id="calendar">
-            <div class="calendar-header">
-                <div>Mon</div>
-                <div>Tue</div>
-                <div>Wed</div>
-                <div>Thu</div>
-                <div>Fri</div>
-                <div>Sat</div>
-                <div>Sun</div>
-            </div>
+            <div class="calendar-header"></div>
+            <h3></h3>
             <div class="calendar-body"></div>
         </div>
     </section>
-    <section id="todos-view" class="view" style="display: none;">
+    <section id="todos-view" class="view">
         <h2>To-Do List</h2>
         <p>This is a placeholder for to-do items.</p>
     </section>

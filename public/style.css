@@ -48,6 +48,14 @@ footer {
 }
 
 
+#medications-view {
+    font-size: large;
+}
+#welcome-view {
+    font-size: 3em;
+}
+
+
 #navigation button {
     margin-right: 10px;
     padding: 5px 10px;
@@ -60,12 +68,12 @@ footer {
 }
 
 #time-display {
-    font-size: 3em; /* Adjust the size as needed */
+    font-size: 10em; /* Adjust the size as needed */
     margin: 0; /* Removes any default margin */
 }
 
 #date-display {
-    font-size: 1em; /* Smaller font size for the date */
+    font-size: 3em; /* Smaller font size for the date */
     margin: 0; /* Ensures the date is directly under the time */
 }
 
@@ -84,13 +92,14 @@ ul {
 }
 
 li {
-    display: flex; /* Enables flexbox layout within each list item */
-    align-items: center; /* Vertically centers the button and text */
-    justify-content: space-between; /* Separates content and button */
+    font-size: 3em;
+    align-items: center; /*Vertically centers the button and text */
     margin: 10px 0;
     padding: 5px;
     background-color: rgba(255, 255, 255, 0.1); /* Adjust as needed */
-    border-radius: 5px;
+    border-radius: 1em;
+    border-style: solid;
+    border-color: #ffffff;
 }
 
 li button {

@@ -48,11 +48,11 @@ async def main():
 
         
 def train_model():
-    onlyfiles = [f for f in listdir("classifierData") if isfile(join("classifierData", f))]
-    aT.extract_features_and_train("classifierData", 1.0, 1.0, aT.shortTermWindow, aT.shortTermStep, "svm", "VoiceRecog", False)
+    onlyfiles = [f for f in listdir("pyAudioAnalysis/pyAudioAnalysis/TomVoice") if isfile(join("pyAudioAnalysis/pyAudioAnalysis/TomVoice", f))]
+    print(onlyfiles)
+    aT.extract_features_and_train(["pyAudioAnalysis/pyAudioAnalysis/TomVoice"], 1.0, 1.0, aT.shortTermWindow, aT.shortTermStep, "svm", "VoiceRecog", False)
     print("model trained")
     # aT.file_classification("user_request.wav", "VoiceRecog","svm")
-
 
 
 asyncio.run(main())

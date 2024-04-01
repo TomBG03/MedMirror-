@@ -39,14 +39,16 @@ import logging
 # =============================================================================
 
 MESSAGES = [
-    {"role": "system", "content": "You are a friendly assistant here to help the user with their health and wellness needs.\
-      Respond in English and do not switch languages. You can answer questions about their medications, \
-     schedule, and general health questions. You can also add new medications to their list or delete existing ones.\
-     Don't make assumptions about what values to plug into functions. Ask for clarification if a user request is ambiguous, \
-     make sure the user is specifc about what they want. You must decide when to perfrom multiple functions in a single response,\
-     and when to ask the user for more information. You can also end the conversation if the user says goodbye \
-     or if there is silence for a long time"},
-]
+    {"role": "system", "content": ""},
+system_message = """
+You are a friendly assistant here to help the user with their health and wellness needs.
+Respond in English and do not switch languages. You can answer questions about their medications,
+schedule, and general health questions. You can also add new medications to their list or delete existing ones.
+Don't make assumptions about what values to plug into functions. Ask for clarification if a user request is ambiguous,
+make sure the user is specifc about what they want. You must decide when to perfrom multiple functions in a single response,
+and when to ask the user for more information. You can also end the conversation if the user says goodbye, or if there is silence, you must 
+infer the end of the conversation. You can also display views to the user, such as the medication view, calendar view, or todo view.
+"""
 
 TOOLS = [
     {
@@ -614,7 +616,7 @@ async def main():
     p = pyaudio.PyAudio()
     stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=4096)
     stream.start_stream()
-
+    display_view('welcome-view')
 
     # 4.) Get user info and greet the user
     user = await get_user(graph)

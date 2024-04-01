@@ -22,6 +22,7 @@ from msgraph.generated.models.location import Location
 from msgraph.generated.models.attendee import Attendee
 from msgraph import GraphServiceClient
 from msgraph.generated.users.item.events.events_request_builder import EventsRequestBuilder
+# from msgraph.generated.users.item.calendar.calendarView.calendar_view_request_builder import CalendarViewRequestBuilder
 from msgraph.generated.models.subscription import Subscription
 from datetime import datetime
 import requests
@@ -148,9 +149,10 @@ class Graph:
         )
         if top is not None:
             query_params.top = top
-        if start_date is not None and end_date is not None:
-            if start_date is not None and end_date is not None:
-                query_params.filter = f"start/dateTime ge '{start_date}' and end/dateTime le '{end_date}'"
+        # if start_date is not None and end_date is not None:
+        #     query_params.filter = f"start/dateTime ge '{start_date}' and end/dateTime le '{end_date}'"
+        if start_date is not None:
+            query_params.filter = f"start/dateTime ge '{start_date}'"
         request_configuration = EventsRequestBuilder.EventsRequestBuilderGetRequestConfiguration(
         query_parameters = query_params,
         )
@@ -165,7 +167,23 @@ class Graph:
                 "end": event.end.date_time
             })
         return event_data
-    
+
+    async def list_calendar_view(self, start_date: str = None, end_date: str = None):
+        access_token = await self.get_user_token()
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'prefer': 'outlook.timezone="GMT Standard Time"'
+        }
+        # start_date = "2024-03-29T00:00:00"
+        # end_date = "2024-03-29T23:59:59"
+        start_date = start_date
+        end_date = end_date
+        
+        url = f"https://graph.microsoft.com/v1.0/me/calendar/calendarView?startDateTime={start_date}&endDateTime={end_date}"
+
+        result = requests.get(url, headers=headers)
+
+        return result
     async def create_event(self, calendar_id: str, subject: str, start: str, end: str, location: str = None, body: str = None, attendees: list = None, is_online : bool = False):
         request_body = Event(
             subject = subject,

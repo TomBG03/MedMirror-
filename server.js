@@ -84,7 +84,36 @@ app.put('/api/medications/:id', async (req, res) => {
     }
 });
 
+const Event = require('./Event'); // Path to Event model
 
+app.get('/api/events', async (req, res) => {
+    try {
+        const events = await Event.find();
+        res.json(events);
+    } catch (error) {
+        res.status(500).send(error);
+    }
+});
+//  add new event
+app.post('/api/events', async (req, res) => {
+    const newEvent = new Event(req.body);
+
+    try {
+        const savedEvent = await newEvent.save();
+        res.status(201).json(savedEvent);
+    } catch (error) {
+        res.status(400).send(error);
+    }
+});
+// clear all events
+app.delete('/api/events', async (req, res) => {
+    try {
+        await Event.deleteMany();
+        res.send({ message: 'All events deleted successfully' });
+    } catch (error) {
+        res.status(500).send(error);
+    }
+});
 
 const ViewState = require('./View'); // Path to View model
 

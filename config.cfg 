@@ -1,4 +1,0 @@
-[azure]
-clientId = YOUR_CLIENT_ID_HERE
-tenantId = common
-graphUserScopes = User.Read Mail.Read Mail.Send

@@ -14,6 +14,8 @@ load_dotenv()
 
 #  USE WHISPER LOCALLY TO TRANSCRIBE AUDIO FILES
 
+#  CHANGE TO CHAT GPT 3.5
+
 class MyAI():
     def __init__(self, TOOLS, MESSAGES):
         self.init_messages = MESSAGES
@@ -120,4 +122,4 @@ class MyAI():
                 print(colored(f"function ({message['name']}): {message['content']}\n", role_to_color[message["role"]]))
 
     def reset_messages(self):
-        self.messages = self.init_messages
+        self.messages = []

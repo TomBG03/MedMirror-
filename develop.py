@@ -32,24 +32,24 @@ from threading import Thread
 import time
 import logging
 from pyAudioAnalysis.pyAudioAnalysis import audioTrainTest as aT
+import pytz
+
 
 
 # =============================================================================
 # Global variables
 # =============================================================================
+
 system_message = """
     You are a dedicated assistant designed to help users manage their health and wellness routines effectively.
     Speak clearly in English, and focus on being as specific as possible with your requests. For any function calls, ensure all necessary details are provided.
     If unsure about what information is needed, please ask for clarity. You can manage calendar events, medications, and to-do lists, 
-    tailoring responses to the user's needs. Remember, specificity is key to successful assistance. Should you conclude the conversation, kindly do so upon 
-    the user's request or after an extended period of inactivity. When asked to edit calendar events or to-do tasks first get the event/task id and then continue 
-    to edit the event, make sure to get confirmation that it has been edited. Do NOT tell the user the id of taks, events, calendars, lists. You have the ability 
-    to do the following: 1) switch views on the user interface to display relevant informaiton 2)add, delete and edit informaiton in the user's medicaiton database 3) 
-    retrieve, read and send emails for the user 4) add, delete and edit events in the user's calendar 5) view tasks in the user's to-do list 6) set reminders for 
-    the user 7) end the conversation with the user, if the user implies they no longer need any more assistance end conversaiton e.g. user says: Thats all thank you. 
+    tailoring responses to the user's needs. Remember, specificity is key to successful assistance. You must infer from the user whether to end the conversation or not. 
+     Do NOT tell the user the id of taks, events, calendars, lists. If the user implies they no longer need any more assistance then end conversaiton example of when to end conversation is when 
+     the user says: 'Thats all thank you' or 'Bye', 'No'. 
     Ask the user if there is anything else they would like to do after each task is completed, if they do not start with 'yes' or 'no' ask them to do so. If they start with 'no'
-    end conversaiton.
-    Be concise and clear in your responses, and always confirm the user's request if they ask to delete before executing it."},
+    then end conversaiton.
+    Be concise and clear in your responses, and always confirm the user's request if they ask to delete an event or update their medication list before executing it.",
 """
 
 MESSAGES = [
@@ -57,6 +57,11 @@ MESSAGES = [
     ]
 
 TOOLS = [
+
+    # ========================================================================================================
+    # CALANDER FUNCTIONS
+    # ========================================================================================================
+
     # Get calendars
     {
         "type": "function",
@@ -99,7 +104,7 @@ TOOLS = [
                         "description": "The day of the end date",
                     }
                 },
-                "required": ["start_date", "end_date"]
+                "required": ["start_year", "start_month", "start_day", "end_year", "end_month", "end_day"]
             }
         }
     },
@@ -183,7 +188,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "edit_calendar_event",
-            "description": "Edits an event of the users calendar by using the event_id. If changing the time must specify the full start and end time. Example request, edit my meeting called Meeting with Jon tomorrow to start at 9am instead of 10am ",
+            "description": "Edits an event of the users calendar by using the event_id. If no change in values keep then use the original ones. If changing the time must specify the full start and end time. Example request, edit my meeting called Meeting with Jon tomorrow to start at 9am instead of 10am.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -270,217 +275,10 @@ TOOLS = [
             },
         }
     },
-    # display welcome screen
-    {
-        "type": "function",
-        "function": {
-            "name": "show_welcome_screen",
-            "description": "display welcome screen on user interface",
-        }
-    },
-    # display mirror
-    {
-        "type": "function",
-        "function": {
-            "name": "show_mirror",
-            "description": "display mirror on user interface",
-        }
-    },
-
-    # display medications
-    {
-        "type": "function",
-        "function": {
-            "name": "show_medications",
-            "description": "display medicaitons on user interface",
-        }
-
-    },
-    # display calendar events
-    {
-        "type": "function",
-        "function": {
-            "name": "show_calendar",
-            "description": "display calendar events on user interface",
-        }
-
-    },
-    # display to-do tasks
-    {
-        "type": "function",
-        "function": {
-            "name": "show_todo_tasks",
-            "description": "display to-do tasks on user interface",
-        }
-
-    },
-
-    # get to-do lists
-    {
-        "type": "function",
-        "function": {
-            "name": "get_todo_lists",
-            "description": "get list of all todo lists and their IDs",
-        }
-    },
-    # get to-do tasks
-    {
-        "type": "function",
-        "function": {
-            "name": "get_todo_tasks",
-            "description": "get list of all tasks in a todo list including their task_id and title",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "list_id": {
-                        "type": "string",
-                        "description": "ID of the todo list",
-                    },
-                },
-                "required": ["list_id"]
-            }
-        }
-    },
-    # add to-do task
-    {
-        "type": "function",
-        "function": {
-            "name": "add_todo_task",
-            "description": "add a new to-do task to a to-do list, each required parameter must be specified explicitly. set reminder time to 30 minutes before due date if not explicitly specified.\
-                Example of request: add a task to my todo list to 'buy groceries' for tomorrow at 8pm ansd remind me 1 hour before",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "list_id": {
-                        "type": "string",
-                        "description": "ID of the todo list",
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "The title of the task",
-                    },
-                    "due_year": {
-                        "type": "integer",
-                        "description": "The year of the due date",
-                    },
-                    "due_month": {
-                        "type": "integer",
-                        "description": "The month of the due date",
-                    },
-                    "due_day": {
-                        "type": "integer",
-                        "description": "The day of the due date",
-                    },
-                    "body": {
-                        "type": "string",
-                        "description": "The body of the task",
-                    },
-                    "reminder_year": {
-                        "type": "integer",
-                        "description": "The year of the reminder date",
-                    },
-                    "reminder_month": {
-                        "type": "integer",
-                        "description": "The month of the reminder date",
-                    },
-                    "reminder_day": {
-                        "type": "integer",
-                        "description": "The day of the reminder date",
-                    },
-                    "reminder_hour": {
-                        "type": "integer",
-                        "description": "The hour of the reminder date",
-                    },
-                    "reminder_minute": {
-                        "type": "integer",
-                        "description": "The minute of the reminder date",
-                    },
-                },
-                "required": ["list_id", "title", "due_year", "due_month", "due_day", "reminder_year", "reminder_month", "reminder_day", "reminder_hour", "reminder_minute"]
-            }
-
-        },
-    },
-    # edit to-do task
-    {
-        "type": "function",
-        "function": {
-            "name": "edit_todo_task",
-            "description": "edit an existing task in the user's todo list by its task_id",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "list_id": {
-                        "type": "string",
-                        "description": "ID of the todo list",
-                    },
-                    "task_id": {
-                        "type": "string",
-                        "description": "ID of the task",
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "The title of the task",
-                    },
-                    "due_year": {
-                        "type": "integer",
-                        "description": "The year of the due date",
-                    },
-                    "due_month": {
-                        "type": "integer",
-                        "description": "The month of the due date",
-                    },
-                    "due_day": {
-                        "type": "integer",
-                        "description": "The day of the due date",
-                    },
-                    "reminder_year": {
-                        "type": "integer",
-                        "description": "The year of the reminder date",
-                    },
-                    "reminder_month": {
-                        "type": "integer",
-                        "description": "The month of the reminder date",
-                    },
-                    "reminder_day": {
-                        "type": "integer",
-                        "description": "The day of the reminder date",
-                    },
-                    "body" : {
-                        "type": "string",
-                        "description": "The body of the task",
-                    },
-                },
-                "required": ["task_id"]
-            }
-        }
-    },
-    # delete to-do task
-    {
-        "type": "function",
-        "function": {
-            "name": "delete_todo_task",
-            "description": "delete/remove a task from the user's todo list by its task_id",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "task_id": {
-                        "type": "string",
-                        "description": "ID of the task",
-                    },
-                },
-                "required": ["task_id"]
-            },
-        }
-    },
-    # end_conversation
-    {
-        "type": "function",
-        "function": {
-            "name": "end_conversation",
-            "description": "Ends the current conversation with the user, can be inferred from users input or silence, e.g. 'goodbye', 'bye', 'stop', 'end conversation', 'that's all thank you' etc.",
-        }
-    },
+    # ========================================================================================================
+    # MEDICATION FUNCTIONS
+    # ========================================================================================================
+    
     #  get medicaitons
     {
         "type": "function",
@@ -563,98 +361,16 @@ TOOLS = [
             },
         }
     },
+    # ========================================================================================================
+    # REMINDER FUNCTIONS
+    # ========================================================================================================
     
-    # read emails 
+    # get reminders
     {
         "type": "function",
         "function": {
-            "name": "read_email",
-            "description": "read the preview content of an email by its email_id",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "email_id": {
-                        "type": "string",
-                        "description": "ID of the email",
-                    },
-                },
-                "required": ["email_id"]
-            }
-        }
-    },
-    # get emails
-    {
-        "type": "function",
-        "function": {
-            "name": "get_emails",
-            "description": "get list of emails from the user's inbox and their email ID, can be filtered by unread, sender, subject, received date, received time, and number of emails to return",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "filter_by_unread": {
-                        "type": "boolean",
-                        "description": "Filter by unread emails",
-                    },
-                    "filter_by_sender": {
-                        "type": "string",
-                        "description": "Filter by sender's email address",
-                    },
-                    "filter_by_subject": {
-                        "type": "string",
-                        "description": "Filter by email subject",
-                    },
-                    "top": {
-                        "type": "integer",
-                        "description": "Number of emails to return",
-                    },
-                    "year": {
-                        "type": "integer",
-                        "description": "The year of the email, if the user wants to filter by received date",
-                    },
-                    "month": {
-                        "type": "integer",
-                        "description": "The month of the email, if the user wants to filter by received date",
-                    },
-                    "day": {
-                        "type": "integer",
-                        "description": "The day of the email, if the user wants to filter by received date",
-                    },
-                    "hour": {
-                        "type": "integer",
-                        "description": "The hour of the email, if the user wants to filter by received time",
-                    },
-                    "minute": {
-                        "type": "integer",
-                        "description": "The minute of the email, if the user wants to filter by received time",
-                    }
-                }
-            }
-        }
-    },
-    # send email
-    {
-        "type": "function",
-        "function": {
-            "name": "send_email",
-            "description": "send an email to a recipient",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "recipient": {
-                        "type": "string",
-                        "description": "The recipient's email address",
-                    },
-                    "subject": {
-                        "type": "string",
-                        "description": "The subject of the email",
-                    },
-                    "body": {
-                        "type": "string",
-                        "description": "The body of the email",
-                    }
-                },
-                "required": ["recipient", "subject", "body"]
-            }
+            "name": "get_reminders",
+            "description": "get list of all scheduled reminders",
         }
     },
     # add one time reminder
@@ -703,7 +419,7 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "add_interval_reminder",
-            "description": "Adds a reminder at a specific interval",
+            "description": "Creates a reminder to repeat at a specific interval, if no end has been specified set it to be 100 years from now Example request: remind me to take my medication every morning at 8am, starting tomorrow",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -711,28 +427,146 @@ TOOLS = [
                         "type": "string",
                         "description": "The message to remind the user about, this can be inferred from the user's request",
                     },
+                    "weeks": {
+                        "type": "integer",
+                        "description": "How many weeks between each reminder interval",
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "How many days between each reminder interval",
+                    },
+                    "hours": {
+                        "type": "integer",
+                        "description": "How many hours between each reminder interval",
+                    },
+                    "minutes": {
+                        "type": "integer",
+                        "description": "How many minutes between each reminder interval",
+                    },
                     "seconds": {
                         "type": "integer",
-                        "description": "The interval in seconds at which the reminder should occur",
+                        "description": "How many seconds between each reminder interval",
                     },
+                    "start_year": {
+                        "type": "integer",
+                        "description": "The year the reminder should start, e.g. 2024",
+                    },
+                    "start_month": {
+                        "type": "integer",
+                        "description": "The month the reminder should start, e.g. 01 for January, 2 for February, etc.",
+                    },
+                    "start_day": {
+                        "type": "integer",
+                        "description": "The day the reminder should start, e.g. 01 for the first day of the month, 2 for the second day, etc.",
+                    },
+                    "start_hour": {
+                        "type": "integer",
+                        "description": "The hour the reminder should start, e.g. 00 for midnight, 16 for 4pm, etc.",
+                    },
+                    "start_minute": {
+                        "type": "integer",
+                        "description": "The minute the reminder should start, e.g. 00 for the start of the hour, 30 for half past, etc.",
+                    },
+                    "start_second": {
+                        "type": "integer",
+                        "description": "The second the reminder should start, e.g. 00 for the start of the minute, 30 for half past, etc.",
+                    },
+                    "end_year": {
+                        "type": "integer",
+                        "description": "The year the reminder should end, e.g. 2024",
+                    },
+                    "end_month": {
+                        "type": "integer",
+                        "description": "The month the reminder should end, e.g. 01 for January, 2 for February, etc.",
+                    },
+                    "end_day": {
+                        "type": "integer",
+                        "description": "The day the reminder should end, e.g. 01 for the first day of the month, 2 for the second day, etc.",
+                    },
+                    "end_hour": {
+                        "type": "integer",
+                        "description": "The hour the reminder should end, e.g. 00 for midnight, 16 for 4pm, etc.",
+                    },
+                    "end_minute": {
+                        "type": "integer",
+                        "description": "The minute the reminder should end, e.g. 00 for the start of the hour, 30 for half past, etc.",
+                    },
+                    "end_second": {
+                        "type": "integer",
+                        "description": "The second the reminder should end, e.g. 00 for the start of the minute, 30 for half past, etc.",
+                    }
+
                 },
-                "required": ["reminder_message", "seconds"]
+                "required": ["reminder_message", "weeks", "days", "hours", "minutes", "seconds", "start_year", "start_month", "start_day", "start_hour", "start_minute", "start_second", "end_year", "end_month", "end_day", "end_hour", "end_minute", "end_second"]
             }
         }
     },
-    # get reminders
+    
+    # ========================================================================================================
+    # LOCAL FUNCTIONS
+    # ========================================================================================================
+
+    # end_conversation
     {
         "type": "function",
         "function": {
-            "name": "get_reminders",
-            "description": "get list of all scheduled reminders",
+            "name": "end_conversation",
+            "description": "Ends the current conversation with the user, can be inferred from users input or silence, e.g. 'goodbye', 'bye', 'stop', 'end conversation', 'that's all thank you' etc.",
         }
+    },
+     # ========================================================================================================
+     # UI functions 
+    # ========================================================================================================
+
+    # display welcome screen
+    {
+        "type": "function",
+        "function": {
+            "name": "show_welcome_screen",
+            "description": "display welcome screen on user interface",
+        }
+    },
+    # display mirror
+    {
+        "type": "function",
+        "function": {
+            "name": "show_mirror",
+            "description": "display mirror on user interface",
+        }
+    },
+
+    # display medications
+    {
+        "type": "function",
+        "function": {
+            "name": "show_medications",
+            "description": "display medicaitons on user interface",
+        }
+
+    },
+    # display calendar events
+    {
+        "type": "function",
+        "function": {
+            "name": "show_calendar",
+            "description": "display calendar events on user interface",
+        }
+
+    },
+    # display to-do tasks
+    {
+        "type": "function",
+        "function": {
+            "name": "show_todo_tasks",
+            "description": "display to-do tasks on user interface",
+        }
+
     },
 
 ]
 
 # =============================================================================
-# Reminder functions
+# Reminder Class
 # =============================================================================
 
 class myScheduler:
@@ -743,29 +577,26 @@ class myScheduler:
 
         self.have_jobs_to_execute = False
         self.jobs_to_execute = []
-
+        self.timezone = pytz.timezone('Europe/London')
+   
     def create_reminder(self, date, reminder_message='Reminder'):
-        self.scheduler.add_job(self.remind_me, 'date', run_date=date, args=[reminder_message])
-
-
-    # def add_reminder(self, seconds, path_to_mp3, reminder_message='Time to take a break!'):
-    #     self.scheduler.add_job(self._play_sound, 'interval', seconds=seconds, args=[reminder_message, path_to_mp3])
-    
-    # def add_single_reminder(self, date, path_to_mp3, reminder_message='Time to take a break!'):
-    #     try:
-    #         self.scheduler.add_job(self._play_sound, 'date', run_date=date, args=[reminder_message, path_to_mp3])
-    #         return "Reminder added"
-    #     except Exception as e:
-    #         return(f"Error: {e}")
-
-    def edit_interval_reminder(self, job_id, seconds, reminder_message='Time to take a break!'):
-        self.scheduler.reschedule_job(job_id, trigger='interval', seconds=seconds, args=[reminder_message])
-    def edit_reminder(self, job_id, date, reminder_message='Time to take a break!'):
+        self.scheduler.add_job(self.remind_me, 'date', run_date=date, timezone = self.timezone, args=[reminder_message])
+        return "successfully created reminder"
+    def create_interval_reminder(self, weeks, days, hours, minutes, seconds, start_date, end_date, reminder_message='Reminder'):
+        self.scheduler.add_job(self.remind_me, 'interval', weeks=weeks, days=days, hours=hours, minutes=minutes, seconds=seconds, start_date=start_date, end_date=end_date, timezone = self.timezone, args=[reminder_message])
+        return "successfully created interval reminder"
+    def edit_interval_reminder(self, job_id, new_weeks, new_days,new_hours, new_minutes, new_seconds, new_start_date, new_end_date, reminder_message=None):
+        self.scheduler.reschedule_job(job_id, trigger='interval', weeks=new_weeks, days=new_days, hours=new_hours, minutes=new_minutes, seconds=new_seconds, start_date=new_start_date, end_date=new_end_date, args=[reminder_message])
+        return "successfully edited interval reminder"
+    def edit_reminder(self, job_id, date, reminder_message=None):
         self.scheduler.reschedule_job(job_id, trigger='date', run_date=date, args=[reminder_message])
+        return "successfully edited reminder"
     def remove_reminder(self, job_id):
         self.scheduler.remove_job(job_id)
+    
     def clear_all_reminders(self):
         self.scheduler.remove_all_jobs()
+    
     def stop(self):
         self.scheduler.shutdown()
     
@@ -786,6 +617,7 @@ class myScheduler:
                 body += f"Reminder {i+1}: {reminder}"
             else:
                 body += f"{reminder}"
+        self.ai.add_message('assistant', body)
         reminder = self.ai.create_mp3(body, 'reminder.mp3')
         playsound(reminder)
         self.have_jobs_to_execute = False
@@ -798,14 +630,24 @@ class myScheduler:
 
     def get_reminders(self):
         return self.scheduler.get_jobs()
+    
     def get_state(self):
         return self.scheduler.state
-    
+
+# =============================================================================
+# Reminder helper functions
+# =============================================================================
+
+async def listen_for_reminders(scheduler):
+    while True:
+        if scheduler.have_jobs_to_execute:
+            return True
+        
 # =============================================================================
 # Audio functions
 # =============================================================================
 
-async def record_audio_to_file(output_filename, stream, rec, silence_duration=2):
+async def record_audio_to_file(output_filename, stream, rec, silence_duration=3):
     wf = wave.open(output_filename, 'wb')
     wf.setnchannels(1)
     wf.setsampwidth(pyaudio.get_sample_size(pyaudio.paInt16))
@@ -825,7 +667,7 @@ async def record_audio_to_file(output_filename, stream, rec, silence_duration=2)
             break
     wf.close()
 
-def listen_for_keyword(stream, rec, keyword="activate"):
+async def listen_for_keyword(stream, rec, keyword="activate"):
     # print("Listening for activation keyword...")
     while True:
         data = stream.read(4096, exception_on_overflow=False)
@@ -885,63 +727,40 @@ async def display_view(view):
     except requests.exceptions.RequestException as e:
         return f"Request failed"
 
-async def get_events():
-    response = requests.get(f'{BASE_URL}/events')
-    if response.status_code == 200:
-        events = response.json()
-        return f"Current events: {events}"
-    else:
-        return "Failed to get events"
-
-async def add_event(title, start, end, location):
-    event = {'title': title, 'start': start, 'end': end, 'location': location}
-    response = requests.post(f'{BASE_URL}/events', json=event)
-    if response.status_code == 201:
-        return("Event successfully added")
-    else:
-        return("Failed to add event")
-
-async def delete_all_events():
-    response = requests.delete(f'{BASE_URL}/events')
-    if response.status_code == 200:
-        return("All events successfully deleted")
-    else:
-        return("Failed to delete events")
-    
-async def show_day_events(events):
-    await delete_all_events()
-    for event in events:
-        print(event['start'])
-        # await add_event(event['title'], event['start'], event['end'], event['location'])
-    # display_view('dayOfEvents-view')
 # =============================================================================
 # Calls to OUTLOOK API
 # =============================================================================
+
 async def get_user(graph: Graph):
     user = await graph.get_user()
     if user:
         return user
     else:
         return "Unable to get user info"
+
 # =============================================================================
+
 async def get_emails(graph: Graph, filter_by_unread: bool = False, filter_by_sender: str = None, filter_by_subject: str = None, filter_by_received_date: str = None, filter_by_received_time: str = None, top: int = 3):
     try:
         result = await graph.get_inbox(filter_by_unread, filter_by_sender, filter_by_subject, filter_by_received_date, filter_by_received_time, top)
         return result
     except Exception as e:
         return "Failed to get emails"
+
 async def read_email(graph: Graph, email_id: str):
     try:
         result = await graph.read_email(email_id)
         return result
     except Exception as e:
         return "Failed to read email"
+
 async def send_email(graph: Graph, recipient: str, subject: str, body: str):
     try:    
         result = await graph.send_mail(subject=subject, body=body, recipient=recipient)
         return result
     except Exception as e:
         return "Failed to send email"
+
 # =============================================================================
 async def get_ToDo_lists(graph: Graph):
     try:
@@ -959,6 +778,7 @@ async def get_ToDo_tasks(graph: Graph, list_id: str):
         return result
     except Exception as e:
         return "Failed to get tasks"
+
 async def add_ToDo_task(graph: Graph, list_id: str, title: str, due_date: str, body: str, reminder_date: str):
     # (self, list_id: str, title: str, due_date: str, body: str = None, reminder_date: datetime = None):
     try:
@@ -982,6 +802,8 @@ async def delete_ToDo_task(graph: Graph, task_id: str):
     except Exception as e:
         return "Failed to delete task"
 
+# =============================================================================
+
 async def get_calendars(graph: Graph):
     try:
         calendars = await graph.get_calendars()
@@ -1002,7 +824,7 @@ async def get_calendar_events(graph: Graph, top: int, start_date: str, end_date:
         events = []
         for event in event_data['value']:
             # print(event)
-            events.append(f"event_id: {event['id']}, Event: {event['subject']} - Start: {event['start']['dateTime']} - End: {event['end']['dateTime']} - Location: {event.get('location', 'N/A')} - Body: {event.get('body', {}).get('content', 'N/A')}")
+            events.append(f"(event_id:{event['id']}) Event: {event['subject']} - Start: {event['start']['dateTime']} - End: {event['end']['dateTime']} - Location: {event.get('location', 'N/A')} - Body: {event.get('body', {}).get('content', 'N/A')}")
         return f"Successfully retrieved calendar events: {events}"
         
         # return f"succesfully retrieved calendar events: {result}"
@@ -1029,24 +851,34 @@ async def delete_calendar_event(graph: Graph, event_id: str):
         return result
     except Exception as e:
         return "failed to delete event"
+    
+
 # ============================================================================= #
 # Execution of fuction calls                                                    #           
 # ============================================================================= #
-
-        
+  
 async def execute_function_call(graph, schedular, tool_call):
+    
+    # See if we need to update the user's data for 
+    # - Medications - Events - Reminders
+    NEED_TO_UPDATE = [0,0,0]
+    
     # Get the name of function to call
+    
     func_name = tool_call.function.name 
     args = json.loads(tool_call.function.arguments)
     
     # ================================================
     # Assisting function calls
+
     if func_name == "end_conversation":
         results = "End Conversation"
     
-    
     # ================================================
     # Outlook API calls
+    # ================================================
+    # # calendar functions
+        
     elif func_name == "get_calendars":
         results = await get_calendars(graph)
     elif func_name == "get_calendar_events":
@@ -1083,6 +915,7 @@ async def execute_function_call(graph, schedular, tool_call):
         end_date = (f"{end_year}-{end_month}-{end_day} {end_hour}:{end_minute}:00")
         print(f"ADD: start_date: {start_date}, end_date: {end_date}")
         results = await add_calendar_event(graph, calendar_id, subject, start_date, end_date, location, body, isOnline)
+        NEED_TO_UPDATE[1] = 1
     elif func_name == "edit_calendar_event":
         event_id = args.get("event_id")
         subject = args.get("subject")
@@ -1103,10 +936,13 @@ async def execute_function_call(graph, schedular, tool_call):
         end_date = (f"{end_year}-{end_month}-{end_day} {end_hour}:{end_minute}:00")
         print(f"EDIT: start_date: {start_date}, end_date: {end_date}")
         results = await edit_calendar_event(graph, event_id, subject, start_date, end_date, location, body, isOnline)
+        NEED_TO_UPDATE[1] = 1
     elif func_name == "delete_calendar_event":
         event_id = args.get("event_id")
         results = await delete_calendar_event(graph, event_id)
-    
+        NEED_TO_UPDATE[1] = 1
+    # # email functions
+        
     elif func_name == "get_emails":
         filter_by_unread = args.get("filter_by_unread", False)
         filter_by_sender = args.get("filter_by_sender", None)
@@ -1133,7 +969,8 @@ async def execute_function_call(graph, schedular, tool_call):
         body = args.get("body")
         results = await send_email(graph, recipient=recipient, subject=subject, body=body)
     
-    
+    # # to-do functions
+        
     elif func_name == "get_todo_lists":
         results = await get_ToDo_lists(graph)
     elif func_name == "get_todo_tasks":
@@ -1171,16 +1008,15 @@ async def execute_function_call(graph, schedular, tool_call):
         due_date = f"{due_year}-{due_month}-{due_day} 00:00:00"
         body = args.get("body")
         results = await edit_ToDo_task(graph, list_id, task_id, title, due_date, body)
-          
     elif func_name == "delete_todo_task":
         task_id = args.get("task_id")
         results = await delete_ToDo_task(graph, task_id)
 
-
-
     # ================================================
     # Backend API calls
-        
+    # ================================================
+    # # medication functions
+    
     elif func_name == "get_medications":
         results = await get_medications()
     elif func_name == "add_medication":
@@ -1188,17 +1024,20 @@ async def execute_function_call(graph, schedular, tool_call):
         dosage = args.get("dosage")
         time = args.get("time")
         results = await add_medication(name, dosage, time)
+        NEED_TO_UPDATE[0] = 1
     elif func_name == "update_medication":
         medication_id = args.get("medication_id")
         name = args.get("name")
         dosage = args.get("dosage")
         time = args.get("time")
         results = await update_medication(medication_id, name, dosage, time)
+        NEED_TO_UPDATE[0] = 1
     elif func_name == "delete_medication":
         medication_id = args.get("medication_id")
         results = await delete_medication(medication_id)
-
-
+        NEED_TO_UPDATE[0] = 1
+    # # UI functions
+        
     elif func_name == "show_welcome_screen":
         results = await display_view("welcome-view")
     elif func_name == "show_mirror":
@@ -1209,13 +1048,12 @@ async def execute_function_call(graph, schedular, tool_call):
         results = await display_view("calendar-view")
     elif func_name == "show_todo_tasks":
         results = await display_view("todos-view")
+    
     # ================================================
     # Reminder function calls
         
     elif func_name == "get_reminders":
         results = schedular.get_reminders()
-        
-
     elif func_name == "add_reminder":
         reminder_message = args.get("reminder_message", "No message")
         year = args.get("Year")
@@ -1227,121 +1065,42 @@ async def execute_function_call(graph, schedular, tool_call):
         date = datetime(year, month, day, hour, minute, second)
         path_to_mp3 = f"{name}.mp3"        
         results = schedular.create_reminder(date, path_to_mp3, reminder_message)
-    
+        NEED_TO_UPDATE[2] = 1
+    elif func_name == "add_interval_reminder":
+        reminder_message = args.get("reminder_message", "No message")
+        weeks = args.get("weeks")
+        days = args.get("days")
+        hours = args.get("hours")
+        minutes = args.get("minutes")
+        seconds = args.get("seconds")
+        start_year = args.get("start_year")
+        start_month = args.get("start_month")
+        start_day = args.get("start_day")
+        start_hour = args.get("start_hour")
+        start_minute = args.get("start_minute")
+        start_second = args.get("start_second")
+        end_year = args.get("end_year")
+        end_month = args.get("end_month")
+        end_day = args.get("end_day")
+        end_hour = args.get("end_hour")
+        end_minute = args.get("end_minute")
+        end_second = args.get("end_second")
+        start_date = datetime(start_year, start_month, start_day, start_hour, start_minute, start_second)
+        end_date = datetime(end_year, end_month, end_day, end_hour, end_minute, end_second)
+        results = schedular.create_interval_reminder(weeks, days, hours, minutes, seconds, start_date, end_date,reminder_message)
+        NEED_TO_UPDATE[2] = 1
     # ================================================
     else:
         results = f"Error: function {func_name} does not exist"
     
-    return results
+    return results, NEED_TO_UPDATE
 
-
-# ============================================================================= #
-# Main function                                                                 #
-# ============================================================================= #
-
-def start_convo():
-    #  record users request 
-    #  do voice recognition
-    #  if voice recognition is successful
-    #  call the function
-    #  if voice recognition is unsuccessful
-    #  ask user to identify 
-    #  if user identifies
-    #  call the function
-    #  if user does not identify
-    #  deny the request exit conversation
-    time.sleep(20)
-    pass
-async def main():
-    logging.basicConfig()
-    logging.getLogger('apscheduler').setLevel(logging.DEBUG)
-
-    # Configure the outlook settings
-    config = configparser.ConfigParser()
-    config.read(['config.cfg', 'config.dev.cfg'])
-    azure_settings = config['azure']
-    graph: Graph = Graph(azure_settings)
-
-    
-
-    # Configure the Vosk settings
-    model_path = "/Users/annushka/Documents/GitHub/MedMirror-/vosk-model-en-us-0.22"
-    output_filename = "output.wav"
-    model = Model(model_path)
-    rec = KaldiRecognizer(model, 16000)
-    rec.SetWords(True)
-    p = pyaudio.PyAudio()
-    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=4096)
-    stream.start_stream()
-
-    # Get user info and greet the user
-    keyword = "activate"
-    user = await get_user(graph)
-    calendars = await get_calendars(graph)
-    toDoLists = await get_ToDo_lists(graph)
-    medications = await get_medications()
-    #  user info message 
-    user_info =  f"{calendars}, {toDoLists}, {medications}"
-    # Initialise openAI chatbot
-    myAI = MyAI(TOOLS, MESSAGES)
-    myAI.add_message("assistant", user_info)
-
-
-    # greet user 
-    greeting = "Hello " + (user.display_name).split(" ")[0] + ", I will be the voice behind the mirror,\
-                 If you need any help just say the keyword 'activate' and I will be here to help you."
-    myAI.add_message("assistant", greeting)
-    path_to_greeting = await myAI.text_to_speech(greeting)
-    if path_to_greeting is not None:
-        playsound(path_to_greeting)
-    
-    # Initialise the scheduler
-    scheduler = myScheduler(myAI)
-    print(scheduler.get_state())
-    scheduler.create_reminder(datetime.now() + timedelta(seconds = 10), "This is a test reminder")
-    # Start listening for the activation keyword
-    try:
-        while True:
-            loop = asyncio.get_running_loop()
-            keyword_listener = loop.run_in_executor(None, listen_for_keyword, stream, rec, "activate")
-            print("Listening for activation keyword...")
-            if await keyword_listener:
-                # keyword activates the assistant
-                print("Activation keyword detected, starting conversation")
-                end_of_conversation = False
-                # now enter conversation
-                while not end_of_conversation:
-                    end_of_conversation = await conversation(output_filename, stream, rec, myAI, graph, scheduler)
-                    if end_of_conversation:
-                        myAI.reset_messages()
-
-            print(scheduler.have_jobs_to_execute)
-            if scheduler.have_jobs_to_execute:
-                #  reminder activates the assistant
-                scheduler.execute_reminders()
-                end_of_conversation = False
-                # now enter conversation
-                while not end_of_conversation:
-                    end_of_conversation = await conversation(output_filename, stream, rec, myAI, graph, scheduler)
-                    if end_of_conversation:
-                        myAI.reset_messages()
-
-
-
-            
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        stream.stop_stream()
-        stream.close()
-        p.terminate() 
-
-
-def main2():
-    aT.extract_features_and_train("classifierData/Tom", 1.0, 1.0, aT.shortTermWindow, aT.shortTermStep, "svm", "VoiceRecog", False)
-    aT.file_classification("user_request.wav", "VoiceRecog","svm")
+# =============================================================================
+# Conversation function
+# =============================================================================
 
 async def conversation(output_filename, stream, rec, myAI, graph, scheduler):
+    need_to_update = [0,0,0]
     #  Give visual prompt to user
     end_of_conversation = False
     print("Listening for user input...")
@@ -1360,7 +1119,8 @@ async def conversation(output_filename, stream, rec, myAI, graph, scheduler):
     assistant_message = await myAI.generate_function_response()
     if hasattr(assistant_message, 'tool_calls') and assistant_message.tool_calls:
         for call in assistant_message.tool_calls:
-            results = await execute_function_call(graph, scheduler, call)
+            results, need_to_update = await execute_function_call(graph, scheduler, call)
+            print(need_to_update)
             myAI.add_func_message("function", call.id, call.function.name, str(results))
             if "End Conversation" in str(results).lower():
                 end_of_conversation = True
@@ -1370,9 +1130,109 @@ async def conversation(output_filename, stream, rec, myAI, graph, scheduler):
     path = await myAI.text_to_speech(str(reply))
     if path is not None:
         playsound(path)
-    return end_of_conversation
+    return end_of_conversation, need_to_update
+
+# =============================================================================
+# Main event loop 
+# =============================================================================
+
+async def main():
+    logging.basicConfig()
+    logging.getLogger('apscheduler').setLevel(logging.DEBUG)
+
+    
+    # Configure the outlook settings
+    config = configparser.ConfigParser()
+    config.read(['config.cfg', 'config.dev.cfg'])
+    azure_settings = config['azure']
+    graph: Graph = Graph(azure_settings)
+
+
+    # Configure the Vosk settings
+    model_path = "/Users/annushka/Documents/GitHub/MedMirror-/vosk-model-en-us-0.22"
+    output_filename = "output.wav"
+    model = Model(model_path)
+    rec = KaldiRecognizer(model, 16000)
+    rec.SetWords(True)
+    p = pyaudio.PyAudio()
+    stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=4096)
+    stream.start_stream()
+
+   
+    # Get user info and greet the user
+    keyword = "activate"
+    user = await get_user(graph)
+    
+    
+    # Initialise openAI chatbot
+    myAI = MyAI(TOOLS, MESSAGES)
+    
+    # Initialise the scheduler
+    scheduler = myScheduler(myAI)
+    print(scheduler.get_state())
+    scheduler.create_reminder(datetime.now() + timedelta(seconds = 10), "This is a test reminder")
+    
+    # UserToDoLists = await get_ToDo_lists(graph)
+    UserMedications = await get_medications()
+    UserReminders = scheduler.get_reminders()
+    UserCalendar = await get_calendars(graph)
+   
+    
+    #  user info message 
+    user_info =  f"{UserCalendar}, {UserMedications}, active reminders: {UserReminders}"
+    myAI.add_message("assistant", user_info)
+
+    
+    # greet user 
+    greeting = "Hello " + (user.display_name).split(" ")[0] + ", I will be the voice behind the mirror,\
+                 If you need any help just say the keyword 'activate' and I will be here to help you."
+    myAI.add_message("assistant", greeting)
+    path_to_greeting = await myAI.text_to_speech(greeting)
+    if path_to_greeting is not None:
+        playsound(path_to_greeting)
+    
+    
+    # Start listening for the activation keyword
+    try:
+        while True:
+            loop = asyncio.get_running_loop()
+            print("Listening for activation keyword...")
+            # keyword_listener = loop.run_in_executor(None, listen_for_keyword, stream, rec, "activate")
+            keyword_listener = loop.run_in_executor(None, listen_for_keyword, stream, rec, keyword)
+            reminder_listener = loop.run_in_executor(None, listen_for_reminders, scheduler)
+            
+
+            
+
+            if await keyword_listener:
+                # keyword activates the assistant
+                reminder_listener.cancel()
+                end_of_conversation = False
+                # now enter conversation
+                while not end_of_conversation:
+                    end_of_conversation, need_to_update = await conversation(output_filename, stream, rec, myAI, graph, scheduler)
+                    if end_of_conversation:
+                        myAI.reset_messages()
+                    
+
+            # print(scheduler.have_jobs_to_execute)
+            if await reminder_listener:
+                keyword_listener.cancel()
+                #  reminder activates the assistant
+                scheduler.execute_reminders()
+                
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        stream.stop_stream()
+        stream.close()
+        p.terminate() 
+
 # ============================================================================= #
 #                           Run the main function                               #
 # ============================================================================= #
         
 asyncio.run(main())
+
+

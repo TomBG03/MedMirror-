@@ -4,19 +4,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupViewButtons() {
+    const showWelcomeBtn = document.getElementById('show-welcome');
+    const showDefaultBtn = document.getElementById('show-mirror');
     const showMedicationsBtn = document.getElementById('show-medications');
     const showCalendarBtn = document.getElementById('show-calendar');
     const showTodosBtn = document.getElementById('show-todos');
 
     showMedicationsBtn.addEventListener('click', () => {
-        switchView('medications-view');
         fetchMedicationsAndUpdateView(); // Fetch medications when the view is switched to
+        switchView('medications-view');
+         
     });
     showCalendarBtn.addEventListener('click', () => {
-        switchView('calendar-view');
         generateCalendar(); // Generate the calendar when the view is switched to
+        switchView('calendar-view');
+        
     });
     
+    showWelcomeBtn.addEventListener('click', () => switchView('welcome-view'));
+    showDefaultBtn.addEventListener('click', () => switchView('mirror-view'));
     showTodosBtn.addEventListener('click', () => switchView('todos-view'));
 }
 
@@ -29,6 +35,30 @@ function switchView(viewId) {
     const selectedView = document.getElementById(viewId);
     selectedView.style.display = 'block'; // Show the selected view
 }
+
+
+// display all events for today in time order
+//  EXAMPLE DO NOT USE 
+function fetchEventsAndUpdateView(){
+    fetch('/api/events').then(response => response.json()).then(events => {
+        const dayStart = 7 * 60; // Day starts at 8 AM, for example
+        const scale = 1; // 1 minute = 1 pixel, adjust as needed
+        const container = document.getElementById('day-container');
+        events.forEach(event => {
+            const eventDiv = document.createElement('div');
+            eventDiv.classList.add('event');
+            const startMinutes = event.startHour * 60 + event.startMinute - dayStart;
+            const duration = (event.endHour * 60 + event.endMinute) - (event.startHour * 60 + event.startMinute);
+            eventDiv.style.top = `${startMinutes * scale}px`;
+            eventDiv.style.height = `${duration * scale}px`;
+            // Add more styling as needed
+            container.appendChild(eventDiv);
+        });
+    });
+}
+
+
+
 
 // MEDICATION FUNCTIONS
 
@@ -55,10 +85,10 @@ function fetchMedicationsAndUpdateView() {
                 listItem.appendChild(medText);
 
                 // Create and append the delete button
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = 'Delete';
-                deleteBtn.onclick = () => deleteMedication(med._id);
-                listItem.appendChild(deleteBtn); // Append button to the listItem
+                // const deleteBtn = document.createElement('button');
+                // deleteBtn.textContent = 'Delete';
+                // deleteBtn.onclick = () => deleteMedication(med._id);
+                // listItem.appendChild(deleteBtn); // Append button to the listItem
 
                 list.appendChild(listItem); // Append listItem to the list
             });
@@ -129,11 +159,14 @@ function checkAndUpdateViewState() {
         .then(data => {
             if (data.currentView && data.currentView !== currentView) {
                 switchView(data.currentView);
+                console.log(currentView);
+                
                 currentView = data.currentView; // Update the currentView variable
             }
         })
         .catch(error => console.error('Error fetching view state:', error));
 }
+
 
 function updateDateTime() {
     const now = new Date();
@@ -153,11 +186,12 @@ function updateDateTime() {
 }
 
     
-let currentView = 'defaultView';
+let currentView = 'welcome-view';
 // Call updateTime() function every minute to keep the time updated
 
-fetchMedicationsAndUpdateView()
+
+// fetchMedicationsAndUpdateView()
 updateDateTime(); // Update time immediately when the page loads
-setInterval(updateDateTime, 60_000);
 checkAndUpdateViewState();
-setInterval(checkAndUpdateViewState, 5_000);
+setInterval(checkAndUpdateViewState, 1_000);
+setInterval(updateDateTime, 10_000);
