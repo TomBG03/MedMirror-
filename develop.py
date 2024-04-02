@@ -33,6 +33,7 @@ import time
 import logging
 from pyAudioAnalysis.pyAudioAnalysis import audioTrainTest as aT
 import pytz
+import re
 
 
 
@@ -49,6 +50,12 @@ system_message = """
      the user says: 'Thats all thank you' or 'Bye', 'No'. 
     Ask the user if there is anything else they would like to do after each task is completed, if they do not start with 'yes' or 'no' ask them to do so. If they start with 'no'
     then end conversaiton.
+    You have the ability 
+    to do the following: 1) switch views on the user interface to display relevant informaiton 2)add, delete and edit informaiton in the user's medicaiton database 3) 
+    retrieve, read and send emails for the user 4) add, delete and edit events in the user's calendar 5) view tasks in the user's to-do list 6) set reminders for 
+    the user 7) end the conversation with the user, if the user implies they no longer need any more assistance end conversaiton e.g. user says: Thats all thank you. 
+    Ask the user if there is anything else they would like to do after each task is completed, if they do not start with 'yes' or 'no' ask them to do so. If they start with 'no'
+    end conversaiton.
     Be concise and clear in your responses, and always confirm the user's request if they ask to delete an event or update their medication list before executing it.",
 """
 
@@ -415,6 +422,7 @@ TOOLS = [
             }
         }
     },
+    # add interval reminder
     {
         "type": "function",
         "function": {
@@ -534,13 +542,12 @@ TOOLS = [
             "description": "display mirror on user interface",
         }
     },
-
     # display medications
     {
         "type": "function",
         "function": {
             "name": "show_medications",
-            "description": "display medicaitons on user interface",
+            "description": "display medicaitons on the user interface",
         }
 
     },
@@ -561,6 +568,43 @@ TOOLS = [
             "description": "display to-do tasks on user interface",
         }
 
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "display_day_view",
+            "description": "display users calendar events for a specific day",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "start_year": {
+                        "type": "integer",
+                        "description": "The year of the start date",
+                    },
+                    "start_month": {
+                        "type": "integer",
+                        "description": "The month of the start date",
+                    },
+                    "start_day": {
+                        "type": "integer",
+                        "description": "The day of the start date",
+                    },
+                    "end_year": {
+                        "type": "integer",
+                        "description": "The year of the end date",
+                    },
+                    "end_month": {
+                        "type": "integer",
+                        "description": "The month of the end date",
+                    },
+                    "end_day": {
+                        "type": "integer",
+                        "description": "The day of the end date",
+                    }
+                },
+                "required": ["start_year", "start_month", "start_day", "end_year", "end_month", "end_day"]
+            }
+        }
     },
 
 ]
@@ -638,16 +682,22 @@ class myScheduler:
 # Reminder helper functions
 # =============================================================================
 
-async def listen_for_reminders(scheduler):
+def listen_for_reminders(scheduler):
     while True:
         if scheduler.have_jobs_to_execute:
             return True
-        
+
+async def check_and_execute_reminders(scheduler, conversation_state):
+    while True:
+        await asyncio.sleep(1) 
+        if not conversation_state.in_conversation and scheduler.have_jobs_to_execute:
+            scheduler.execute_reminders()
+  
 # =============================================================================
 # Audio functions
 # =============================================================================
 
-async def record_audio_to_file(output_filename, stream, rec, silence_duration=3):
+async def record_audio_to_file(output_filename, stream, rec, silence_duration=2):
     wf = wave.open(output_filename, 'wb')
     wf.setnchannels(1)
     wf.setsampwidth(pyaudio.get_sample_size(pyaudio.paInt16))
@@ -668,14 +718,16 @@ async def record_audio_to_file(output_filename, stream, rec, silence_duration=3)
     wf.close()
 
 async def listen_for_keyword(stream, rec, keyword="activate"):
-    # print("Listening for activation keyword...")
+    loop = asyncio.get_running_loop()
     while True:
-        data = stream.read(4096, exception_on_overflow=False)
+        data = await loop.run_in_executor(None, stream.read, 4096, False)
         if rec.AcceptWaveform(data):
             result = json.loads(rec.Result())
             if keyword.lower() in [word['word'].lower() for word in result.get('result', [])]:
                 print(f"Activation keyword '{keyword}' detected.")
                 return True
+        await asyncio.sleep(0.1)  # Prevent this loop from hogging the CPU
+
 
 # =============================================================================
 # Calls to BACKEND API
@@ -726,6 +778,28 @@ async def display_view(view):
             return f"Failed to display view, status code: {response.status_code}"
     except requests.exceptions.RequestException as e:
         return f"Request failed"
+
+async def display_day_view(graph: Graph, top: int, start_date: str, end_date: str, just_events = 'yes'):
+    response = requests.delete(f'{BASE_URL}/events')
+    if response.status_code == 500:
+        print("Failed to clear events")
+        
+    print(f"Get day view events: {start_date} - {end_date}")
+    events = await get_calendar_events(graph, top, start_date, end_date, just_events)
+    
+    for event in events:
+        print(f"subject: {str(event[0])} - start: {str(event[1])} - end: {str(event[2])} - location: {str(event[3])} - body: {str(event[4])}")
+        event = {'subject': str(event[0]), 'start': str(event[1]), 'end': str(event[2]), 'location': str(event[3])}
+        response = requests.post(f'{BASE_URL}/events', json=event)
+        if response.status_code != 201:
+            print("Failed to display day view")
+        
+    print("Successfully added events to databse")
+  
+    results = await display_view("calendar-view")
+
+    print(results)
+
 
 # =============================================================================
 # Calls to OUTLOOK API
@@ -815,17 +889,21 @@ async def get_calendars(graph: Graph):
     except Exception as e:
         return "Failed to get calendars"
     
-async def get_calendar_events(graph: Graph, top: int, start_date: str, end_date: str):
+async def get_calendar_events(graph: Graph, top: int, start_date: str, end_date: str, just_events = 'no'):
     try:
         # result = await graph.get_calendar_events(top=top, start_date=start_date, end_date=end_date)
         response = await graph.list_calendar_view(start_date=start_date, end_date=end_date)
         print("got response")
         event_data = response.json()
         events = []
-        for event in event_data['value']:
-            # print(event)
-            events.append(f"(event_id:{event['id']}) Event: {event['subject']} - Start: {event['start']['dateTime']} - End: {event['end']['dateTime']} - Location: {event.get('location', 'N/A')} - Body: {event.get('body', {}).get('content', 'N/A')}")
-        return f"Successfully retrieved calendar events: {events}"
+        if just_events == 'yes':
+            for event in event_data['value']:
+                events.append([event['subject'], event['start']['dateTime'], event['end']['dateTime'], event.get('location', 'N/A'), event.get('body', {}).get('content', 'N/A')])
+            return events
+        else:
+            for event in event_data['value']:
+                events.append(f"(event_id:{event['id']}) Event: {event['subject']} - Start: {event['start']['dateTime']} - End: {event['end']['dateTime']} - Location: {event.get('location', 'N/A')} - Body: {event.get('body', {}).get('content', 'N/A')}")
+            return f"Successfully retrieved calendar events: {events}"
         
         # return f"succesfully retrieved calendar events: {result}"
     except Exception as e:
@@ -1038,6 +1116,17 @@ async def execute_function_call(graph, schedular, tool_call):
         NEED_TO_UPDATE[0] = 1
     # # UI functions
         
+    elif func_name == "display_day_view":
+        top = None
+        start_year = args.get("start_year")
+        start_month = args.get("start_month")
+        start_day = args.get("start_day")
+        end_year = args.get("end_year")
+        end_month = args.get("end_month")
+        end_day = args.get("end_day")
+        start_date = f"{start_year}-{start_month}-{start_day}T00:00:00"
+        end_date = f"{end_year}-{end_month}-{end_day}T23:59:59"
+        results = await display_day_view(graph, top, start_date, end_date, just_events='yes')
     elif func_name == "show_welcome_screen":
         results = await display_view("welcome-view")
     elif func_name == "show_mirror":
@@ -1096,8 +1185,34 @@ async def execute_function_call(graph, schedular, tool_call):
     return results, NEED_TO_UPDATE
 
 # =============================================================================
-# Conversation function
+# Conversation 
 # =============================================================================
+class ConversationState:
+    def __init__(self):
+        self.in_conversation = False
+
+    def start_conversation(self):
+        self.in_conversation = True
+
+    def end_conversation(self):
+        self.in_conversation = False
+
+async def listen_and_respond(stream, rec, myAI, graph, scheduler, conversation_state, output_filename="output.wav"):
+    try:
+        while True:
+            print("Listening for activation keyword...")
+            # Assume here you adapt the keyword listening for async and it now sets the conversation state
+            keyword_detected = await listen_for_keyword(stream, rec, "activate")
+            if keyword_detected:
+                end_of_conversation = False
+                conversation_state.start_conversation()
+                while not end_of_conversation:
+                    end_of_conversation, need_to_update = await conversation(output_filename, stream, rec, myAI, graph, scheduler)
+                    if end_of_conversation:
+                        myAI.reset_messages()
+                conversation_state.end_conversation()
+    except Exception as e:
+        print(f"Error during conversation: {e}")
 
 async def conversation(output_filename, stream, rec, myAI, graph, scheduler):
     need_to_update = [0,0,0]
@@ -1170,7 +1285,6 @@ async def main():
     # Initialise the scheduler
     scheduler = myScheduler(myAI)
     print(scheduler.get_state())
-    scheduler.create_reminder(datetime.now() + timedelta(seconds = 10), "This is a test reminder")
     
     # UserToDoLists = await get_ToDo_lists(graph)
     UserMedications = await get_medications()
@@ -1191,43 +1305,19 @@ async def main():
     if path_to_greeting is not None:
         playsound(path_to_greeting)
     
+
+    # Initialise the conversation state
+    conversation_state = ConversationState()
+
+    # Create test reminder
+    scheduler.create_reminder(datetime.now() + timedelta(seconds = 30), "This is a test reminder")
+    scheduler.create_interval_reminder(0, 0, 0, 1, 0, datetime.now() + timedelta(seconds = 15), datetime.now() + timedelta(minutes = 10), "This is a test interval reminder for every minute")
     
-    # Start listening for the activation keyword
-    try:
-        while True:
-            loop = asyncio.get_running_loop()
-            print("Listening for activation keyword...")
-            # keyword_listener = loop.run_in_executor(None, listen_for_keyword, stream, rec, "activate")
-            keyword_listener = loop.run_in_executor(None, listen_for_keyword, stream, rec, keyword)
-            reminder_listener = loop.run_in_executor(None, listen_for_reminders, scheduler)
-            
-
-            
-
-            if await keyword_listener:
-                # keyword activates the assistant
-                reminder_listener.cancel()
-                end_of_conversation = False
-                # now enter conversation
-                while not end_of_conversation:
-                    end_of_conversation, need_to_update = await conversation(output_filename, stream, rec, myAI, graph, scheduler)
-                    if end_of_conversation:
-                        myAI.reset_messages()
-                    
-
-            # print(scheduler.have_jobs_to_execute)
-            if await reminder_listener:
-                keyword_listener.cancel()
-                #  reminder activates the assistant
-                scheduler.execute_reminders()
-                
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        stream.stop_stream()
-        stream.close()
-        p.terminate() 
+    # Start the main conversation loop
+    conversation_task = asyncio.create_task(listen_and_respond(stream, rec, myAI, graph, scheduler, conversation_state))
+    reminder_task = asyncio.create_task(check_and_execute_reminders(scheduler, conversation_state))
+    
+    await asyncio.gather(conversation_task, reminder_task)
 
 # ============================================================================= #
 #                           Run the main function                               #

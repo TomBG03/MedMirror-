@@ -1,34 +1,12 @@
-document.addEventListener('DOMContentLoaded', () => {
-    setupViewButtons();
-    //setupSpeechRecognition();
-});
-
-function setupViewButtons() {
-    const showWelcomeBtn = document.getElementById('show-welcome');
-    const showDefaultBtn = document.getElementById('show-mirror');
-    const showMedicationsBtn = document.getElementById('show-medications');
-    const showCalendarBtn = document.getElementById('show-calendar');
-    const showTodosBtn = document.getElementById('show-todos');
-
-    showMedicationsBtn.addEventListener('click', () => {
-        fetchMedicationsAndUpdateView(); // Fetch medications when the view is switched to
-        switchView('medications-view');
-         
-    });
-    showCalendarBtn.addEventListener('click', () => {
-        generateCalendar(); // Generate the calendar when the view is switched to
-        switchView('calendar-view');
-        
-    });
-    
-    showWelcomeBtn.addEventListener('click', () => switchView('welcome-view'));
-    showDefaultBtn.addEventListener('click', () => switchView('mirror-view'));
-    showTodosBtn.addEventListener('click', () => switchView('todos-view'));
-}
-
 
 // VIEW FUNCTIONS
 function switchView(viewId) {
+    if (viewId == 'medications-view') {
+        fetchMedicationsAndUpdateView();
+    }
+    if (viewId == 'calendar-view') {
+        fetchEventsAndDisplay();
+    }
     const views = document.querySelectorAll('.view');
     views.forEach(view => view.style.display = 'none'); // Hide all views
 
@@ -39,22 +17,40 @@ function switchView(viewId) {
 
 // display all events for today in time order
 //  EXAMPLE DO NOT USE 
-function fetchEventsAndUpdateView(){
-    fetch('/api/events').then(response => response.json()).then(events => {
-        const dayStart = 7 * 60; // Day starts at 8 AM, for example
-        const scale = 1; // 1 minute = 1 pixel, adjust as needed
-        const container = document.getElementById('day-container');
-        events.forEach(event => {
-            const eventDiv = document.createElement('div');
-            eventDiv.classList.add('event');
-            const startMinutes = event.startHour * 60 + event.startMinute - dayStart;
-            const duration = (event.endHour * 60 + event.endMinute) - (event.startHour * 60 + event.startMinute);
-            eventDiv.style.top = `${startMinutes * scale}px`;
-            eventDiv.style.height = `${duration * scale}px`;
-            // Add more styling as needed
-            container.appendChild(eventDiv);
-        });
-    });
+function fetchEventsAndDisplay() {
+    fetch('/api/events')
+        .then(response => response.json())
+        .then(events => {
+            const container = document.getElementById('calendar-view');
+            container.innerHTML = ''; // Clear existing events
+            
+            events.forEach(event => {
+                const eventElement = document.createElement('div');
+                eventElement.classList.add('event');
+                
+                // Assuming 'start' and 'end' are ISO strings
+                const startTime = new Date(event.start);
+                const endTime = new Date(event.end);
+
+                // Example: Position based on a day starting at 8 AM and ending at 5 PM
+                const dayStart = 7;
+                const dayEnd = 23;
+                const hoursInDay = dayEnd - dayStart;
+
+                // Calculate top and height based on event's start and end time
+                const minutesFromDayStart = (startTime.getHours() - dayStart) * 60 + startTime.getMinutes();
+                const eventDuration = (endTime - startTime) / (1000 * 60); // Duration in minutes
+
+                const pixelsPerMinute = container.clientHeight / (hoursInDay * 60); // Convert container height to total day minutes
+
+                eventElement.style.top = `${minutesFromDayStart * pixelsPerMinute}px`;
+                eventElement.style.height = `${eventDuration * pixelsPerMinute}px`;
+
+                eventElement.textContent = `${event.subject} (${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()})`;
+                container.appendChild(eventElement);
+            });
+        })
+        .catch(error => console.error('Error fetching events:', error));
 }
 
 
@@ -190,8 +186,8 @@ let currentView = 'welcome-view';
 // Call updateTime() function every minute to keep the time updated
 
 
-// fetchMedicationsAndUpdateView()
+fetchMedicationsAndUpdateView()
 updateDateTime(); // Update time immediately when the page loads
 checkAndUpdateViewState();
-setInterval(checkAndUpdateViewState, 1_000);
+setInterval(`checkAndUpdateViewState`, 1_000);
 setInterval(updateDateTime, 10_000);
