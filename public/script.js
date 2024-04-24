@@ -11,7 +11,7 @@ function switchView(viewId) {
     views.forEach(view => view.style.display = 'none'); // Hide all views
 
     const selectedView = document.getElementById(viewId);
-    selectedView.style.display = 'block'; // Show the selected view
+    selectedView.style.display = 'flex'; // Show the selected view
 }
 
 
@@ -21,38 +21,55 @@ function fetchEventsAndDisplay() {
     fetch('/api/events')
         .then(response => response.json())
         .then(events => {
-            const container = document.getElementById('calendar-view');
-            container.innerHTML = ''; // Clear existing events
-            
+            const calendarView = document.getElementById('calendar-view');
+            const timeColumn = calendarView.querySelector('.time-column');
+            const eventsContainer = calendarView.querySelector('.events-container');
+
+            // Clear previous content
+            timeColumn.innerHTML = '';
+            eventsContainer.innerHTML = '';
+
+            // Generate time slots from 7 AM to 11 PM
+            for (let hour = 7; hour <= 23; hour++) {
+                const timeSlot = document.createElement('div');
+                timeSlot.classList.add('time-slot');
+                timeSlot.textContent = `${String(hour).padStart(2, '0')}:00`;
+                timeColumn.appendChild(timeSlot);
+            }
+
+            // Assuming each time slot is 1 hour and the container's full height represents the hours from 7 AM to 11 PM (16 hours)
+            const hourHeight = eventsContainer.clientHeight / 17; // 16 hours plus 7 AM slot
+
+            // Sort events by start time
+            events.sort((a, b) => new Date(a.start) - new Date(b.start));
+
+            // Display events
             events.forEach(event => {
                 const eventElement = document.createElement('div');
                 eventElement.classList.add('event');
-                
-                // Assuming 'start' and 'end' are ISO strings
                 const startTime = new Date(event.start);
                 const endTime = new Date(event.end);
 
-                // Example: Position based on a day starting at 8 AM and ending at 5 PM
-                const dayStart = 7;
-                const dayEnd = 23;
-                const hoursInDay = dayEnd - dayStart;
+                // Check if event start or end time is within the schedule hours (7 AM to 11 PM)
+                const startHour = startTime.getHours() + startTime.getMinutes() / 60;
+                const endHour = endTime.getHours() + endTime.getMinutes() / 60;
 
-                // Calculate top and height based on event's start and end time
-                const minutesFromDayStart = (startTime.getHours() - dayStart) * 60 + startTime.getMinutes();
-                const eventDuration = (endTime - startTime) / (1000 * 60); // Duration in minutes
+                if (startHour >= 7 && endHour <= 23) {
+                    const positionStart = startHour - 7; // Shift position to start at 7 AM
+                    const positionEnd = endHour <= 23 ? endHour - 7 : 16; // Do not go beyond 11 PM
 
-                const pixelsPerMinute = container.clientHeight / (hoursInDay * 60); // Convert container height to total day minutes
+                    // Calculate event position and height
+                    eventElement.style.top = `${positionStart * hourHeight}px`;
+                    eventElement.style.height = `${(positionEnd - positionStart) * hourHeight}px`;
+                    eventElement.textContent = `${event.subject} (${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()})`;
 
-                eventElement.style.top = `${minutesFromDayStart * pixelsPerMinute}px`;
-                eventElement.style.height = `${eventDuration * pixelsPerMinute}px`;
-
-                eventElement.textContent = `${event.subject} (${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()})`;
-                container.appendChild(eventElement);
+                    // Append event to the events container
+                    eventsContainer.appendChild(eventElement);
+                }
             });
         })
         .catch(error => console.error('Error fetching events:', error));
 }
-
 
 
 
@@ -181,7 +198,7 @@ function updateDateTime() {
     
 }
 
-    
+switchView('welcome-view');   
 let currentView = 'welcome-view';
 // Call updateTime() function every minute to keep the time updated
 
@@ -189,5 +206,5 @@ let currentView = 'welcome-view';
 fetchMedicationsAndUpdateView()
 updateDateTime(); // Update time immediately when the page loads
 checkAndUpdateViewState();
-setInterval(`checkAndUpdateViewState`, 1_000);
-setInterval(updateDateTime, 10_000);
+setInterval(checkAndUpdateViewState, 1_000);
+setInterval(updateDateTime, 1_000);

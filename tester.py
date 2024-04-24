@@ -1238,3 +1238,34 @@ def main2():
 
 asyncio.run(main1())
 
+async def initialise_chatBot():
+    pass
+async def initialise_outlook():
+    # initialise outlook 
+    pass
+
+async def initialise_schedular():
+    # initialise schedular
+    pass
+
+async def main():
+    await initialise_chatBot()
+    await initialise_outlook()
+    await initialise_schedular()
+
+    try:
+        loop = asyncio.get_running_loop()
+        keyword_listener = loop.run_in_executor(None, listen_for_keyword, stream, rec, "activate")
+        print("Listening for activation keyword...")
+        while True:
+            if await keyword_listener:
+                # enter conversation
+                pass
+            
+    
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        stream.stop_stream()
+        stream.close()
+        p.terminate()   

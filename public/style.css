@@ -53,8 +53,15 @@ footer {
 }
 #welcome-view {
     font-size: 3em;
+    font: white;
 }
-
+#welcome-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
 
 #navigation button {
     margin-right: 10px;
@@ -117,18 +124,33 @@ li button:hover {
 }
 
 #calendar-view {
-    position: relative;
-    height: 600px; /* Adjust based on your layout */
-    border: 1px solid #ffffff;
-    margin: 20px;
+    display: flex;
+}
+
+.time-column {
+    flex: 0 0 100px; /* Adjust the width as needed */
+    background: #000000; /* Just for visibility */
+}
+
+.events-container {
+    flex-grow: 1;
+    position: relative; /* Events will be positioned relative to this container */
+    background: #000000; /* Just for visibility */
+}
+
+.time-slot {
+    /* Style for the time slots */
+    height: 60px; /* Adjust based on your design */
+    border-bottom: 2px solid #ffffffd6; /* Just for visibility */
+    border-right: 3px dashed #ffffffd6; /* Just for visibility */
 }
 
 .event {
-    font-size: medium;
+    font-size: 1.1em; /* Adjust the font size as needed */
     position: absolute;
-    width: 95%;
-    left: 2.5%;
-    /* background-color: lightblue; */
-    border: 1px solid rgb(255, 255, 255);
-    box-sizing: border-box;
+    left: 0;
+    right: 0;
+    background: #1d1c1c; /* Just for visibility */
+    border: 1px solid #ffffff;
+    /* Add other styling as needed */
 }

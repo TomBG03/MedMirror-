@@ -38,8 +38,7 @@ import logging
 # Global variables
 # =============================================================================
 
-MESSAGES = [
-    {"role": "system", "content": ""},
+
 system_message = """
 You are a friendly assistant here to help the user with their health and wellness needs.
 Respond in English and do not switch languages. You can answer questions about their medications,
@@ -592,6 +591,10 @@ async def execute_function_call(graph, schedular, tool_call):
         # 6.7)  Play the speech
     # 7.)  Wait for conversaiton to end
 # =============================================================================
+MESSAGES = [
+    {"role": "system", "content": system_message},
+]
+
 async def main():
     logging.basicConfig()
     logging.getLogger('apscheduler').setLevel(logging.DEBUG)
@@ -606,6 +609,8 @@ async def main():
     # 2.) Initialise openAI chatbot
     myAI = MyAI(TOOLS, MESSAGES)
 
+    await display_view('welcome-view')
+    
 
     # 3.) Configure the Vosk settings
     model_path = "/Users/annushka/Documents/GitHub/MedMirror-/vosk-model-en-us-0.22"

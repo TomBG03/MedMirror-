@@ -21,7 +21,8 @@ class MyAI():
         self.init_messages = MESSAGES
         self.messages = MESSAGES
         self.TOOLS = TOOLS
-        self.model = "gpt-4-0125-preview"
+        self.model = 'gpt-3.5-turbo'
+        # self.model = "gpt-4-0125-preview"
         self.whisper_model = whisper.load_model("base")
         self.key = os.getenv('OPENAI_API_KEY')
         self.client = OpenAI(api_key=self.key)
@@ -30,7 +31,8 @@ class MyAI():
     async def speech_to_text(self, audio_file):
         transcript = self.client.audio.transcriptions.create(
             model="whisper-1", 
-            file=audio_file
+            file=audio_file,
+            language="en",
         )
         return transcript.text
 

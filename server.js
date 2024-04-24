@@ -132,3 +132,27 @@ app.post('/api/view', async (req, res) => {
   await ViewState.updateOne({}, { currentView: viewName }, { upsert: true });
   res.send({ status: 'View updated successfully', currentView: viewName });
 });
+
+
+const FeatureUsage = require('./FeatureUsage'); 
+
+app.post('/api/featureUsage', async (req, res) => {
+    try {
+      const {featureName} = req.body;
+      const newUsage = new FeatureUsage({ featureName});
+      await newUsage.save();
+      res.status(201).json({ message: "Feature usage logged successfully." });
+    } catch (error) {
+      res.status(500).send(error);
+    }
+  });
+  
+  app.get('/api/featureUsage', async (req, res) => {
+    try {
+      const usageData = await FeatureUsage.find({});
+      // Further processing can be done here as needed, e.g., counting, aggregating
+      res.json(usageData);
+    } catch (error) {
+      res.status(500).send(error);
+    }
+  });
